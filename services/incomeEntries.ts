@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { IncomeEntry } from '../models/IncomeEntry';
-import { Op } from 'sequelize';
 import {
   createIncomeEntryObject,
   postMonthlyData,
