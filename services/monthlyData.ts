@@ -11,7 +11,13 @@ router.get('/', async (_, res) => {
     return;
   }
 
-  res.json(monthlyData);
+  const sortedByMonth = [...monthlyData].sort((a, b) => {
+    const aMonth = a.yearMonth.split('-')[1].padStart(2, '0');
+    const bMonth = b.yearMonth.split('-')[1].padStart(2, '0');
+    return parseInt(aMonth) - parseInt(bMonth);
+  });
+
+  res.json(sortedByMonth);
 });
 
 export default router;

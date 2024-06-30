@@ -19,7 +19,30 @@ export const createIncomeEntryObject = (body: IncomeEntryBody) => {
   };
 };
 
-export const updateMonthlyDataPut = async ({ incomeEntry }: { incomeEntry: IncomeEntry }) => {
+export const postMonthlyData = async ({ incomeEntry }: { incomeEntry: IncomeEntry }) => {
+  const { amount, date } = incomeEntry;
+  const parsedAmount = parseFloat(amount);
+  const year = date.split('-')[0];
+  const month = date.split('-')[1];
+
+  const yearMonth = `${year}-${month}`;
+  const monthlyData = await MonthlyData.findOne({
+    where: { yearMonth, type: MonthlyDataTypes.Income },
+  });
+
+  if (monthlyData) {
+    await monthlyData.increment('amount', { by: parsedAmount });
+    return;
+  }
+
+  await MonthlyData.create({
+    type: MonthlyDataTypes.Income,
+    amount: parsedAmount,
+    yearMonth,
+  });
+};
+
+export const putMonthlyData = async ({ incomeEntry }: { incomeEntry: IncomeEntry }) => {
   const { date } = incomeEntry;
   const year = date.split('-')[0];
   const month = date.split('-')[1];
@@ -52,29 +75,6 @@ export const updateMonthlyDataPut = async ({ incomeEntry }: { incomeEntry: Incom
   await MonthlyData.create({
     type: MonthlyDataTypes.Income,
     amount: totalAmount,
-    yearMonth,
-  });
-};
-
-export const updateMonthlyDataPost = async ({ incomeEntry }: { incomeEntry: IncomeEntry }) => {
-  const { amount, date } = incomeEntry;
-  const parsedAmount = parseFloat(amount);
-  const year = date.split('-')[0];
-  const month = date.split('-')[1];
-
-  const yearMonth = `${year}-${month}`;
-  const monthlyData = await MonthlyData.findOne({
-    where: { yearMonth, type: MonthlyDataTypes.Income },
-  });
-
-  if (monthlyData) {
-    await monthlyData.increment('amount', { by: parsedAmount });
-    return;
-  }
-
-  await MonthlyData.create({
-    type: MonthlyDataTypes.Income,
-    amount: parsedAmount,
     yearMonth,
   });
 };
