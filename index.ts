@@ -4,6 +4,7 @@ import cors from 'cors';
 import expensesRouter from './services/expenses';
 import monthlyData from './services/monthlyData';
 import incomeEntries from './services/incomeEntries';
+import exportCsV from './services/exportCsv';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -14,6 +15,7 @@ app.use(express.json());
 app.use('/expenses', expensesRouter);
 app.use('/monthlyData', monthlyData);
 app.use('/income', incomeEntries);
+app.use('/export', exportCsV);
 
 sequelizeConfig
   .authenticate()
