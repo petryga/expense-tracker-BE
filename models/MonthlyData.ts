@@ -10,7 +10,7 @@ export class MonthlyData extends Model {
   declare id: number;
   declare type: MonthlyDataTypes;
   declare amount: number;
-  declare yearMonth: number;
+  declare yearMonth: string;
   declare month: number;
 }
 

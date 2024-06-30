@@ -1,10 +1,6 @@
 import { Router } from 'express';
 import { Expense } from '../models/Expense';
-import {
-  createExpenseObject,
-  updateMonthlyDataPost,
-  updateMonthlyDataPut,
-} from '../utils/expensesUtils';
+import { createExpenseObject, putMonthlyData, postMonthlyData } from '../utils/expensesUtils';
 import { Op } from 'sequelize';
 import { handleError } from '../utils/common';
 
@@ -98,7 +94,7 @@ router.post('/', async (req, res) => {
       const newExpenses = await Expense.bulkCreate(expenses);
 
       for (const expense of newExpenses) {
-        await updateMonthlyDataPost({ expense });
+        await postMonthlyData({ expense });
       }
       res.status(201).json(newExpenses);
       return;
@@ -106,7 +102,7 @@ router.post('/', async (req, res) => {
 
     const expense = createExpenseObject(req.body);
     const newExpense = await Expense.create(expense);
-    await updateMonthlyDataPost({ expense: newExpense });
+    await postMonthlyData({ expense: newExpense });
 
     res.status(201).json(newExpense);
   } catch (error) {
@@ -138,7 +134,7 @@ router.delete('/', async (req, res) => {
     });
 
     for (const expense of expenses) {
-      await updateMonthlyDataPut({ expense });
+      await putMonthlyData({ expense });
     }
     res.status(204).send();
   } catch (error) {
@@ -159,7 +155,7 @@ router.delete('/:id', async (req, res) => {
     }
 
     await expense.destroy();
-    await updateMonthlyDataPut({ expense });
+    await putMonthlyData({ expense });
     res.status(204).end();
   } catch (error) {
     handleError(res, error, 'Failed to delete expense');
@@ -181,7 +177,7 @@ router.put('/:id', async (req, res) => {
     }
 
     await expense.update(updatedExpenseData);
-    await updateMonthlyDataPut({ expense });
+    await putMonthlyData({ expense });
     res.status(200).json(expense);
   } catch (error) {
     handleError(res, error, 'Failed to update expense');

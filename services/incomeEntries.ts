@@ -3,8 +3,8 @@ import { IncomeEntry } from '../models/IncomeEntry';
 import { Op } from 'sequelize';
 import {
   createIncomeEntryObject,
-  updateMonthlyDataPost,
-  updateMonthlyDataPut,
+  postMonthlyData,
+  putMonthlyData,
 } from '../utils/incomeEntriesUtils';
 import { handleError } from '../utils/common';
 
@@ -28,7 +28,7 @@ router.post('/', async (req, res) => {
       const newIncomeEntries = await IncomeEntry.bulkCreate(incomeEntries);
 
       for (const incomeEntry of newIncomeEntries) {
-        await updateMonthlyDataPost({ incomeEntry });
+        await postMonthlyData({ incomeEntry });
       }
       res.status(201).json(newIncomeEntries);
       return;
@@ -36,7 +36,7 @@ router.post('/', async (req, res) => {
 
     const income = createIncomeEntryObject(req.body);
     const newIncomeEntry = await IncomeEntry.create(income);
-    await updateMonthlyDataPost({ incomeEntry: newIncomeEntry });
+    await postMonthlyData({ incomeEntry: newIncomeEntry });
 
     res.status(201).json(newIncomeEntry);
   } catch (error) {
@@ -57,7 +57,7 @@ router.put('/:id', async (req, res) => {
     }
 
     const updatedIncomeEntry = await incomeEntry.update(req.body);
-    await updateMonthlyDataPut({ incomeEntry: updatedIncomeEntry });
+    await putMonthlyData({ incomeEntry: updatedIncomeEntry });
 
     res.json(updatedIncomeEntry);
   } catch (error) {
@@ -77,7 +77,7 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Income entry not found' });
     }
 
-    await updateMonthlyDataPut({ incomeEntry });
+    await putMonthlyData({ incomeEntry });
     await incomeEntry.destroy();
 
     res.status(204).end();

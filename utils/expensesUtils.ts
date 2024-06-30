@@ -26,7 +26,28 @@ export const createExpenseObject = (body: ExpenseBody) => {
   };
 };
 
-export const updateMonthlyDataPut = async ({ expense }: { expense: Expense }) => {
+export const postMonthlyData = async ({ expense }: { expense: Expense }) => {
+  const { amount, year, month } = expense;
+  const yearMonth = `${year}-${month}`;
+  const parsedAmount = parseFloat(amount);
+
+  const monthlyData = await MonthlyData.findOne({
+    where: { yearMonth, type: MonthlyDataTypes.Expense },
+  });
+
+  if (monthlyData) {
+    await monthlyData.increment('amount', { by: parsedAmount });
+    return;
+  }
+
+  await MonthlyData.create({
+    type: MonthlyDataTypes.Expense,
+    amount: parsedAmount,
+    yearMonth,
+  });
+};
+
+export const putMonthlyData = async ({ expense }: { expense: Expense }) => {
   const { year, month } = expense;
   const yearMonth = `${year}-${month}`;
 
@@ -56,27 +77,6 @@ export const updateMonthlyDataPut = async ({ expense }: { expense: Expense }) =>
   await MonthlyData.create({
     type: MonthlyDataTypes.Expense,
     amount: totalAmount,
-    yearMonth,
-  });
-};
-
-export const updateMonthlyDataPost = async ({ expense }: { expense: Expense }) => {
-  const { amount, year, month } = expense;
-  const yearMonth = `${year}-${month}`;
-  const parsedAmount = parseFloat(amount);
-
-  const monthlyData = await MonthlyData.findOne({
-    where: { yearMonth, type: MonthlyDataTypes.Expense },
-  });
-
-  if (monthlyData) {
-    await monthlyData.increment('amount', { by: parsedAmount });
-    return;
-  }
-
-  await MonthlyData.create({
-    type: MonthlyDataTypes.Expense,
-    amount: parsedAmount,
     yearMonth,
   });
 };
