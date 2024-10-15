@@ -1,13 +1,18 @@
 import { Model, DataTypes } from 'sequelize';
 import { sequelize } from '../config/database';
 
+export enum Currency {
+  CAD = 'CAD',
+  USD = 'USD',
+}
+
 export class IncomeEntry extends Model {
   declare id: string;
   declare date: string;
   declare description: string;
   declare category: string;
   declare amount: string;
-  declare currency: string;
+  declare currency: Currency | '';
 }
 
 IncomeEntry.init(
@@ -46,7 +51,7 @@ IncomeEntry.init(
     currency: {
       type: DataTypes.STRING,
       allowNull: false,
-      defaultValue: 'CAD',
+      defaultValue: Currency.CAD,
     },
   },
   {

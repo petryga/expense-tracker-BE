@@ -1,6 +1,11 @@
 import { Model, DataTypes } from 'sequelize';
 import { sequelize } from '../config/database';
 
+export enum Currency {
+  CAD = 'CAD',
+  USD = 'USD',
+}
+
 export class Expense extends Model {
   declare id: string;
   declare category: string;
@@ -10,7 +15,7 @@ export class Expense extends Model {
   declare year: number | null;
   declare month: number | null;
   declare datePosted: string;
-  declare currency: string;
+  declare currency: Currency | '';
 }
 
 Expense.init(
@@ -61,7 +66,7 @@ Expense.init(
     currency: {
       type: DataTypes.STRING,
       allowNull: false,
-      defaultValue: 'CAD',
+      defaultValue: Currency.CAD,
     },
   },
   {

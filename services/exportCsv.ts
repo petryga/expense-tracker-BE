@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { Expense } from '../models/Expense';
+import { Currency, Expense } from '../models/Expense';
 import { createObjectCsvWriter } from 'csv-writer';
 import { formatDate } from '../utils/exportUtils';
 
@@ -27,7 +27,7 @@ router.get('/', async (req, res) => {
       category: expense.category || 'Default Category',
       description: expense.description || 'No description',
       amount: expense.amount || 0,
-      currency: expense.currency || 'CAD',
+      currency: expense.currency || Currency.CAD,
       account: expense.account || 'Default Account',
     }));
 

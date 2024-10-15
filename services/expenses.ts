@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { Expense } from '../models/Expense';
+import { Currency, Expense } from '../models/Expense';
 import { createExpenseObject, putMonthlyData, postMonthlyData } from '../utils/expensesUtils';
 import { Op } from 'sequelize';
 import { handleError } from '../utils/common';
@@ -22,7 +22,7 @@ router.get('/', async (req, res) => {
     });
 
     const totalAmountCad = expenseData.reduce((acc, expense) => {
-      if (expense.currency === 'CAD') {
+      if (expense.currency === Currency.CAD) {
         const amount = parseFloat(expense.amount);
         return acc + amount;
       }
@@ -30,7 +30,7 @@ router.get('/', async (req, res) => {
     }, 0);
 
     const totalAmountUsd = expenseData.reduce((acc, expense) => {
-      if (expense.currency === 'USD') {
+      if (expense.currency === Currency.USD) {
         const amount = parseFloat(expense.amount);
         return acc + amount;
       }
@@ -68,7 +68,7 @@ router.get('/', async (req, res) => {
     })
       .then((expenses) => {
         const totalAmountCad = expenses.reduce((acc, expense) => {
-          if (expense.currency === 'CAD') {
+          if (expense.currency === Currency.CAD) {
             const amount = parseFloat(expense.amount);
             return acc + amount;
           }
@@ -76,7 +76,7 @@ router.get('/', async (req, res) => {
         }, 0);
 
         const totalAmountUsd = expenses.reduce((acc, expense) => {
-          if (expense.currency === 'USD') {
+          if (expense.currency === Currency.USD) {
             const amount = parseFloat(expense.amount);
             return acc + amount;
           }
