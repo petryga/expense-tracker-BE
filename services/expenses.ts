@@ -21,17 +21,30 @@ router.get('/', async (req, res) => {
       return expense.year === parseInt(year) && expense.month === parseInt(month);
     });
 
-    const totalAmount = expenseData.reduce((acc, expense) => {
-      const amount = parseFloat(expense.amount);
-      return acc + amount;
+    const totalAmountCad = expenseData.reduce((acc, expense) => {
+      if (expense.currency === 'CAD') {
+        const amount = parseFloat(expense.amount);
+        return acc + amount;
+      }
+      return acc;
+    }, 0);
+
+    const totalAmountUsd = expenseData.reduce((acc, expense) => {
+      if (expense.currency === 'USD') {
+        const amount = parseFloat(expense.amount);
+        return acc + amount;
+      }
+      return acc;
     }, 0);
 
     const data = {
       data: expenseData,
       expensesTotal: {
-        totalAmountThisMonth: totalAmount.toFixed(2),
+        totalAmountThisMonthCad: totalAmountCad.toFixed(2),
+        totalAmountThisMonthUsd: totalAmountUsd.toFixed(2),
       },
     };
+
     res.json(data);
     return;
   }
@@ -54,14 +67,27 @@ router.get('/', async (req, res) => {
       },
     })
       .then((expenses) => {
-        const totalAmount = expenses.reduce((acc, expense) => {
-          const amount = parseFloat(expense.amount);
-          return acc + amount;
+        const totalAmountCad = expenses.reduce((acc, expense) => {
+          if (expense.currency === 'CAD') {
+            const amount = parseFloat(expense.amount);
+            return acc + amount;
+          }
+          return acc;
         }, 0);
+
+        const totalAmountUsd = expenses.reduce((acc, expense) => {
+          if (expense.currency === 'USD') {
+            const amount = parseFloat(expense.amount);
+            return acc + amount;
+          }
+          return acc;
+        }, 0);
+
         const data = {
           data: expenses,
           expensesTotal: {
-            totalAmountSearchResults: totalAmount.toFixed(2),
+            totalAmountSearchResultsCad: totalAmountCad.toFixed(2),
+            totalAmountSearchResultsUsd: totalAmountUsd.toFixed(2),
           },
         };
         res.json(data);

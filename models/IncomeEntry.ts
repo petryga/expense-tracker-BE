@@ -7,6 +7,7 @@ export class IncomeEntry extends Model {
   declare description: string;
   declare category: string;
   declare amount: string;
+  declare currency: string;
 }
 
 IncomeEntry.init(
@@ -41,6 +42,11 @@ IncomeEntry.init(
     updatedAt: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
+    },
+    currency: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'CAD',
     },
   },
   {

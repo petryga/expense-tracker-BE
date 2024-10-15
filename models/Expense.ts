@@ -10,6 +10,7 @@ export class Expense extends Model {
   declare year: number | null;
   declare month: number | null;
   declare datePosted: string;
+  declare currency: string;
 }
 
 Expense.init(
@@ -56,6 +57,11 @@ Expense.init(
     updatedAt: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
+    },
+    currency: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'CAD',
     },
   },
   {
