@@ -1,6 +1,6 @@
 import { capitalizeWords } from './common';
 import { MonthlyData, MonthlyDataTypes } from '../models/MonthlyData';
-import { IncomeEntry } from '../models/IncomeEntry';
+import { Currency, IncomeEntry } from '../models/IncomeEntry';
 import { Op } from 'sequelize';
 
 interface IncomeEntryBody {
@@ -31,9 +31,9 @@ export const postMonthlyData = async ({ incomeEntry }: { incomeEntry: IncomeEntr
   });
 
   if (monthlyData) {
-    if (currency === 'CAD') {
+    if (currency === Currency.CAD) {
       await monthlyData.increment('amountCad', { by: parsedAmount });
-    } else if (currency === 'USD') {
+    } else if (currency === Currency.USD) {
       await monthlyData.increment('amountUsd', { by: parsedAmount });
     }
     return;
@@ -41,8 +41,8 @@ export const postMonthlyData = async ({ incomeEntry }: { incomeEntry: IncomeEntr
 
   await MonthlyData.create({
     type: MonthlyDataTypes.Income,
-    amountCad: currency === 'CAD' ? parsedAmount : 0,
-    amountUsd: currency === 'USD' ? parsedAmount : 0,
+    amountCad: currency === Currency.CAD ? parsedAmount : 0,
+    amountUsd: currency === Currency.USD ? parsedAmount : 0,
     yearMonth,
   });
 };
@@ -63,11 +63,11 @@ export const putMonthlyData = async ({ incomeEntry }: { incomeEntry: IncomeEntry
   });
 
   const totalAmountCad = allIncomeEntriesThatMonth.reduce((acc, entry) => {
-    return acc + (entry.currency === 'CAD' ? parseFloat(entry.amount) : 0);
+    return acc + (entry.currency === Currency.CAD ? parseFloat(entry.amount) : 0);
   }, 0);
 
   const totalAmountUsd = allIncomeEntriesThatMonth.reduce((acc, entry) => {
-    return acc + (entry.currency === 'USD' ? parseFloat(entry.amount) : 0);
+    return acc + (entry.currency === Currency.USD ? parseFloat(entry.amount) : 0);
   }, 0);
 
   if (monthlyData) {

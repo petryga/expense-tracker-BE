@@ -1,5 +1,5 @@
 import { getMonth, getYear, parseISO } from 'date-fns';
-import { Expense } from '../models/Expense';
+import { Currency, Expense } from '../models/Expense';
 import { MonthlyData, MonthlyDataTypes } from '../models/MonthlyData';
 import { capitalizeWords } from './common';
 
@@ -10,7 +10,7 @@ interface ExpenseBody {
   description: string;
   datePosted: string;
   id: string;
-  currency: string;
+  currency: Currency | '';
 }
 
 export const createExpenseObject = (body: ExpenseBody) => {
@@ -37,9 +37,9 @@ export const postMonthlyData = async ({ expense }: { expense: Expense }) => {
   });
 
   if (monthlyData) {
-    if (currency === 'CAD') {
+    if (currency === Currency.CAD) {
       await monthlyData.increment('amountCad', { by: parsedAmount });
-    } else if (currency === 'USD') {
+    } else if (currency === Currency.USD) {
       await monthlyData.increment('amountUsd', { by: parsedAmount });
     }
     return;
@@ -47,8 +47,8 @@ export const postMonthlyData = async ({ expense }: { expense: Expense }) => {
 
   await MonthlyData.create({
     type: MonthlyDataTypes.Expense,
-    amountCad: currency === 'CAD' ? parsedAmount : 0,
-    amountUsd: currency === 'USD' ? parsedAmount : 0,
+    amountCad: currency === Currency.CAD ? parsedAmount : 0,
+    amountUsd: currency === Currency.USD ? parsedAmount : 0,
     yearMonth,
   });
 };
@@ -66,11 +66,11 @@ export const putMonthlyData = async ({ expense }: { expense: Expense }) => {
   });
 
   const totalAmountCad = allExpensesThatMonth.reduce((acc, entry) => {
-    return acc + (entry.currency === 'CAD' ? parseFloat(entry.amount) : 0);
+    return acc + (entry.currency === Currency.CAD ? parseFloat(entry.amount) : 0);
   }, 0);
 
   const totalAmountUsd = allExpensesThatMonth.reduce((acc, entry) => {
-    return acc + (entry.currency === 'USD' ? parseFloat(entry.amount) : 0);
+    return acc + (entry.currency === Currency.USD ? parseFloat(entry.amount) : 0);
   }, 0);
 
   if (monthlyData) {
