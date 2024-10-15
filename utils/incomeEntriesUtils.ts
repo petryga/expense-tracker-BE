@@ -20,7 +20,7 @@ export const createIncomeEntryObject = (body: IncomeEntryBody) => {
 };
 
 export const postMonthlyData = async ({ incomeEntry }: { incomeEntry: IncomeEntry }) => {
-  const { amount, date } = incomeEntry;
+  const { amount, date, currency } = incomeEntry;
   const parsedAmount = parseFloat(amount);
   const year = date.split('-')[0];
   const month = date.split('-')[1];
@@ -31,13 +31,18 @@ export const postMonthlyData = async ({ incomeEntry }: { incomeEntry: IncomeEntr
   });
 
   if (monthlyData) {
-    await monthlyData.increment('amount', { by: parsedAmount });
+    if (currency === 'CAD') {
+      await monthlyData.increment('amountCad', { by: parsedAmount });
+    } else if (currency === 'USD') {
+      await monthlyData.increment('amountUsd', { by: parsedAmount });
+    }
     return;
   }
 
   await MonthlyData.create({
     type: MonthlyDataTypes.Income,
-    amount: parsedAmount,
+    amountCad: currency === 'CAD' ? parsedAmount : 0,
+    amountUsd: currency === 'USD' ? parsedAmount : 0,
     yearMonth,
   });
 };
@@ -57,24 +62,31 @@ export const putMonthlyData = async ({ incomeEntry }: { incomeEntry: IncomeEntry
     where: { date: { [Op.startsWith]: yearMonth } },
   });
 
-  const totalAmount = allIncomeEntriesThatMonth.reduce(
-    (acc, incomeEntry) => acc + parseFloat(incomeEntry.amount),
-    0
-  );
+  const totalAmountCad = allIncomeEntriesThatMonth.reduce((acc, entry) => {
+    return acc + (entry.currency === 'CAD' ? parseFloat(entry.amount) : 0);
+  }, 0);
+
+  const totalAmountUsd = allIncomeEntriesThatMonth.reduce((acc, entry) => {
+    return acc + (entry.currency === 'USD' ? parseFloat(entry.amount) : 0);
+  }, 0);
 
   if (monthlyData) {
-    if (totalAmount === 0) {
+    if (totalAmountCad === 0 && totalAmountUsd === 0) {
       await monthlyData.destroy();
       return;
     }
 
-    await monthlyData.update({ amount: totalAmount });
+    await monthlyData.update({
+      amountCad: totalAmountCad,
+      amountUsd: totalAmountUsd,
+    });
     return;
   }
 
   await MonthlyData.create({
     type: MonthlyDataTypes.Income,
-    amount: totalAmount,
+    amountCad: totalAmountCad,
+    amountUsd: totalAmountUsd,
     yearMonth,
   });
 };

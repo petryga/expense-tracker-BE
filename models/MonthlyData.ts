@@ -9,7 +9,8 @@ export enum MonthlyDataTypes {
 export class MonthlyData extends Model {
   declare id: number;
   declare type: MonthlyDataTypes;
-  declare amount: number;
+  declare amountCad: number;
+  declare amountUsd: number;
   declare yearMonth: string;
   declare month: number;
 }
@@ -27,7 +28,12 @@ MonthlyData.init(
       values: [MonthlyDataTypes.Expense, MonthlyDataTypes.Income],
       allowNull: false,
     },
-    amount: {
+    amountCad: {
+      type: DataTypes.DECIMAL,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    amountUsd: {
       type: DataTypes.DECIMAL,
       allowNull: false,
       defaultValue: 0,

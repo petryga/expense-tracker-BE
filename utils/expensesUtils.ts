@@ -10,6 +10,7 @@ interface ExpenseBody {
   description: string;
   datePosted: string;
   id: string;
+  currency: string;
 }
 
 export const createExpenseObject = (body: ExpenseBody) => {
@@ -27,7 +28,7 @@ export const createExpenseObject = (body: ExpenseBody) => {
 };
 
 export const postMonthlyData = async ({ expense }: { expense: Expense }) => {
-  const { amount, year, month } = expense;
+  const { amount, year, month, currency } = expense;
   const yearMonth = `${year}-${month}`;
   const parsedAmount = parseFloat(amount);
 
@@ -36,13 +37,18 @@ export const postMonthlyData = async ({ expense }: { expense: Expense }) => {
   });
 
   if (monthlyData) {
-    await monthlyData.increment('amount', { by: parsedAmount });
+    if (currency === 'CAD') {
+      await monthlyData.increment('amountCad', { by: parsedAmount });
+    } else if (currency === 'USD') {
+      await monthlyData.increment('amountUsd', { by: parsedAmount });
+    }
     return;
   }
 
   await MonthlyData.create({
     type: MonthlyDataTypes.Expense,
-    amount: parsedAmount,
+    amountCad: currency === 'CAD' ? parsedAmount : 0,
+    amountUsd: currency === 'USD' ? parsedAmount : 0,
     yearMonth,
   });
 };
@@ -59,24 +65,31 @@ export const putMonthlyData = async ({ expense }: { expense: Expense }) => {
     where: { year, month },
   });
 
-  const totalAmount = allExpensesThatMonth.reduce(
-    (acc, expense) => acc + parseFloat(expense.amount),
-    0
-  );
+  const totalAmountCad = allExpensesThatMonth.reduce((acc, entry) => {
+    return acc + (entry.currency === 'CAD' ? parseFloat(entry.amount) : 0);
+  }, 0);
+
+  const totalAmountUsd = allExpensesThatMonth.reduce((acc, entry) => {
+    return acc + (entry.currency === 'USD' ? parseFloat(entry.amount) : 0);
+  }, 0);
 
   if (monthlyData) {
-    if (totalAmount === 0) {
+    if (totalAmountCad === 0 && totalAmountUsd === 0) {
       await monthlyData.destroy();
       return;
     }
 
-    await monthlyData.update({ amount: totalAmount });
+    await monthlyData.update({
+      amountCad: totalAmountCad,
+      amountUsd: totalAmountUsd,
+    });
     return;
   }
 
   await MonthlyData.create({
     type: MonthlyDataTypes.Expense,
-    amount: totalAmount,
+    amountCad: totalAmountCad,
+    amountUsd: totalAmountUsd,
     yearMonth,
   });
 };

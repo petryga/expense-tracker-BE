@@ -16,6 +16,7 @@ router.get('/', async (req, res) => {
         { id: 'category', title: 'Category' },
         { id: 'description', title: 'Description' },
         { id: 'amount', title: 'Amount' },
+        { id: 'currency', title: 'Currency' },
         { id: 'account', title: 'Account' },
       ],
     });
@@ -26,6 +27,7 @@ router.get('/', async (req, res) => {
       category: expense.category || 'Default Category',
       description: expense.description || 'No description',
       amount: expense.amount || 0,
+      currency: expense.currency || 'CAD',
       account: expense.account || 'Default Account',
     }));
 
