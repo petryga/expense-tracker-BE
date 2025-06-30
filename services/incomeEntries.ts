@@ -11,7 +11,12 @@ const router = Router();
 
 router.get('/', async (_, res) => {
   try {
-    const incomeEntries = await IncomeEntry.findAll({ order: [['date', 'DESC']] });
+    const incomeEntries = await IncomeEntry.findAll({
+      order: [
+        ['date', 'DESC'],
+        ['category', 'ASC'],
+      ],
+    });
 
     res.json(incomeEntries);
   } catch (error) {
