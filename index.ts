@@ -8,6 +8,7 @@ import exportCsV from './services/exportCsv';
 
 const app = express();
 const port = process.env.PORT || 3000;
+const host = process.env.HOST || '0.0.0.0';
 
 app.use(cors());
 app.use(express.json());
@@ -22,6 +23,6 @@ sequelizeConfig
   .then(() => console.log('Database connection has been established successfully.'))
   .catch((err) => console.error('Unable to connect to the database:', err));
 
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+app.listen(Number(port), host, () => {
+  console.log(`Server running at http://${host}:${port}`);
 });
