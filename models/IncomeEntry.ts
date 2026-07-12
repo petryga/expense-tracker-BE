@@ -13,6 +13,7 @@ export class IncomeEntry extends Model {
   declare category: string;
   declare amount: string;
   declare currency: Currency | '';
+  declare userId: string;
 }
 
 IncomeEntry.init(
@@ -52,6 +53,10 @@ IncomeEntry.init(
       type: DataTypes.STRING,
       allowNull: false,
       defaultValue: Currency.CAD,
+    },
+    userId: {
+      type: DataTypes.UUID,
+      allowNull: true,
     },
   },
   {

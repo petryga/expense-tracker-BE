@@ -4,6 +4,7 @@ import { createExpenseObject, putMonthlyData, postMonthlyData } from '../utils/e
 import { Op } from 'sequelize';
 import { handleError } from '../utils/common';
 
+
 const router = Router();
 
 router.get('/', async (req, res) => {
@@ -11,7 +12,9 @@ router.get('/', async (req, res) => {
     search?: string;
     yearMonth?: string;
   };
+  const userId = req.userId;
   const expenses = await Expense.findAll({
+    where: { userId },
     order: [['datePosted', 'DESC']],
   });
 
@@ -52,6 +55,7 @@ router.get('/', async (req, res) => {
   if (search) {
     Expense.findAll({
       where: {
+        userId,
         [Op.or]: [
           {
             description: {
@@ -114,8 +118,9 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
+    const userId = req.userId;
     if (Array.isArray(req.body)) {
-      const expenses = req.body.map(createExpenseObject);
+      const expenses = req.body.map((item) => createExpenseObject(item, userId));
 
       const newExpenses = await Expense.bulkCreate(expenses);
 
@@ -126,12 +131,12 @@ router.post('/', async (req, res) => {
       return;
     }
 
-    const expense = createExpenseObject(req.body);
+    const expense = createExpenseObject(req.body, userId);
     const newExpense = await Expense.create(expense);
     await postMonthlyData({ expense: newExpense });
 
     res.status(201).json(newExpense);
-  } catch (error) {
+  } catch (error: any) {
     handleError(res, error, 'Failed to create new expense');
   }
 });
@@ -143,9 +148,11 @@ router.delete('/', async (req, res) => {
   }
 
   try {
+    const userId = req.userId;
     const expenses = await Expense.findAll({
       where: {
         id: ids,
+        userId,
       },
     });
 
@@ -156,6 +163,7 @@ router.delete('/', async (req, res) => {
     await Expense.destroy({
       where: {
         id: ids,
+        userId,
       },
     });
 
@@ -163,7 +171,7 @@ router.delete('/', async (req, res) => {
       await putMonthlyData({ expense });
     }
     res.status(204).send();
-  } catch (error) {
+  } catch (error: any) {
     handleError(res, error, 'Failed to delete expenses');
   }
 });
@@ -175,7 +183,7 @@ router.delete('/:id', async (req, res) => {
   }
 
   try {
-    const expense = await Expense.findByPk(id);
+    const expense = await Expense.findOne({ where: { id, userId: req.userId } });
     if (!expense) {
       return res.status(404).json({ error: 'Expense not found' });
     }
@@ -183,7 +191,7 @@ router.delete('/:id', async (req, res) => {
     await expense.destroy();
     await putMonthlyData({ expense });
     res.status(204).end();
-  } catch (error) {
+  } catch (error: any) {
     handleError(res, error, 'Failed to delete expense');
   }
 });
@@ -196,16 +204,16 @@ router.put('/:id', async (req, res) => {
   }
 
   try {
-    const updatedExpenseData = createExpenseObject(req.body);
-    const expense = await Expense.findByPk(id);
+    const expense = await Expense.findOne({ where: { id, userId: req.userId } });
     if (!expense) {
       return res.status(404).json({ error: 'Expense not found' });
     }
 
+    const updatedExpenseData = createExpenseObject(req.body, req.userId);
     await expense.update(updatedExpenseData);
     await putMonthlyData({ expense });
     res.status(200).json(expense);
-  } catch (error) {
+  } catch (error: any) {
     handleError(res, error, 'Failed to update expense');
   }
 });
