@@ -15,13 +15,16 @@ describe('postMonthlyData', () => {
     const incomeEntry = { amount: '3500', date: '2026-07-15', currency: Currency.CAD, userId: 'u1' } as IncomeEntry;
     await postMonthlyData({ incomeEntry });
 
-    expect(createSpy).toHaveBeenCalledWith({
-      type: MonthlyDataTypes.Income,
-      amountCad: 3500,
-      amountUsd: 0,
-      yearMonth: '2026-07',
-      userId: 'u1',
-    });
+    expect(createSpy).toHaveBeenCalledWith(
+      {
+        type: MonthlyDataTypes.Income,
+        amountCad: 3500,
+        amountUsd: 0,
+        yearMonth: '2026-07',
+        userId: 'u1',
+      },
+      { transaction: undefined }
+    );
   });
 
   it('creates a new USD row when none exists yet for the month', async () => {
@@ -31,13 +34,16 @@ describe('postMonthlyData', () => {
     const incomeEntry = { amount: '200', date: '2026-07-15', currency: Currency.USD, userId: 'u1' } as IncomeEntry;
     await postMonthlyData({ incomeEntry });
 
-    expect(createSpy).toHaveBeenCalledWith({
-      type: MonthlyDataTypes.Income,
-      amountCad: 0,
-      amountUsd: 200,
-      yearMonth: '2026-07',
-      userId: 'u1',
-    });
+    expect(createSpy).toHaveBeenCalledWith(
+      {
+        type: MonthlyDataTypes.Income,
+        amountCad: 0,
+        amountUsd: 200,
+        yearMonth: '2026-07',
+        userId: 'u1',
+      },
+      { transaction: undefined }
+    );
   });
 
   it('increments the CAD total on an existing row instead of creating a new one', async () => {
@@ -79,7 +85,10 @@ describe('putMonthlyData', () => {
     const incomeEntry = { date: '2026-07-15', userId: 'u1' } as IncomeEntry;
     await putMonthlyData({ incomeEntry });
 
-    expect(update).toHaveBeenCalledWith({ amountCad: 3000, amountUsd: 150 });
+    expect(update).toHaveBeenCalledWith(
+      { amountCad: 3000, amountUsd: 150 },
+      { transaction: undefined }
+    );
   });
 
   it('scopes the recalculation query to entries whose date starts with the yearMonth', async () => {

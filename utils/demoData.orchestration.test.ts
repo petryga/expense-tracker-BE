@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { resetDemoUserData } from './demoData';
+import { sequelize } from '../config/database';
 import { Expense } from '../models/Expense';
 import { IncomeEntry } from '../models/IncomeEntry';
 import { RecurringExpense } from '../models/RecurringExpense';
@@ -7,6 +8,10 @@ import { RecurringIncomeEntry } from '../models/RecurringIncomeEntry';
 import { MonthlyData } from '../models/MonthlyData';
 
 const USER_ID = 'demo-user-123';
+// resetDemoUserData runs everything inside sequelize.transaction; the
+// callback form only receives the transaction, so a plain marker object
+// stands in for it and lets us assert every call was scoped to it.
+const FAKE_TRANSACTION = { fake: true } as any;
 
 beforeEach(() => {
   // Fully deterministic: expenseCount becomes 6 (the minimum) every month,
@@ -15,6 +20,9 @@ beforeEach(() => {
   // orchestration (what gets wiped and what gets created), not the fake
   // data's content, which is already covered in demoData.test.ts.
   vi.spyOn(Math, 'random').mockReturnValue(0);
+
+  vi.spyOn(sequelize, 'transaction').mockImplementation(((fn: any) =>
+    fn(FAKE_TRANSACTION)) as any);
 
   vi.spyOn(Expense, 'destroy').mockResolvedValue(0);
   vi.spyOn(Expense, 'create').mockImplementation((data: any) => Promise.resolve(data));
@@ -41,11 +49,26 @@ describe('resetDemoUserData', () => {
   it('wipes all five tables scoped to the given userId before reseeding', async () => {
     await resetDemoUserData(USER_ID);
 
-    expect(Expense.destroy).toHaveBeenCalledWith({ where: { userId: USER_ID } });
-    expect(IncomeEntry.destroy).toHaveBeenCalledWith({ where: { userId: USER_ID } });
-    expect(RecurringExpense.destroy).toHaveBeenCalledWith({ where: { userId: USER_ID } });
-    expect(RecurringIncomeEntry.destroy).toHaveBeenCalledWith({ where: { userId: USER_ID } });
-    expect(MonthlyData.destroy).toHaveBeenCalledWith({ where: { userId: USER_ID } });
+    expect(Expense.destroy).toHaveBeenCalledWith({
+      where: { userId: USER_ID },
+      transaction: FAKE_TRANSACTION,
+    });
+    expect(IncomeEntry.destroy).toHaveBeenCalledWith({
+      where: { userId: USER_ID },
+      transaction: FAKE_TRANSACTION,
+    });
+    expect(RecurringExpense.destroy).toHaveBeenCalledWith({
+      where: { userId: USER_ID },
+      transaction: FAKE_TRANSACTION,
+    });
+    expect(RecurringIncomeEntry.destroy).toHaveBeenCalledWith({
+      where: { userId: USER_ID },
+      transaction: FAKE_TRANSACTION,
+    });
+    expect(MonthlyData.destroy).toHaveBeenCalledWith({
+      where: { userId: USER_ID },
+      transaction: FAKE_TRANSACTION,
+    });
   });
 
   it('creates 6 fake expenses and 2 fake income entries per month across 6 months, all owned by userId', async () => {

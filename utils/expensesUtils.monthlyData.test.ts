@@ -15,13 +15,16 @@ describe('postMonthlyData', () => {
     const expense = { amount: '100.50', year: 2026, month: 7, currency: Currency.CAD, userId: 'u1' } as Expense;
     await postMonthlyData({ expense });
 
-    expect(createSpy).toHaveBeenCalledWith({
-      type: MonthlyDataTypes.Expense,
-      amountCad: 100.5,
-      amountUsd: 0,
-      yearMonth: '2026-7',
-      userId: 'u1',
-    });
+    expect(createSpy).toHaveBeenCalledWith(
+      {
+        type: MonthlyDataTypes.Expense,
+        amountCad: 100.5,
+        amountUsd: 0,
+        yearMonth: '2026-7',
+        userId: 'u1',
+      },
+      { transaction: undefined }
+    );
   });
 
   it('creates a new USD row when none exists yet for the month', async () => {
@@ -31,13 +34,16 @@ describe('postMonthlyData', () => {
     const expense = { amount: '50', year: 2026, month: 7, currency: Currency.USD, userId: 'u1' } as Expense;
     await postMonthlyData({ expense });
 
-    expect(createSpy).toHaveBeenCalledWith({
-      type: MonthlyDataTypes.Expense,
-      amountCad: 0,
-      amountUsd: 50,
-      yearMonth: '2026-7',
-      userId: 'u1',
-    });
+    expect(createSpy).toHaveBeenCalledWith(
+      {
+        type: MonthlyDataTypes.Expense,
+        amountCad: 0,
+        amountUsd: 50,
+        yearMonth: '2026-7',
+        userId: 'u1',
+      },
+      { transaction: undefined }
+    );
   });
 
   it('increments the CAD total on an existing row instead of creating a new one', async () => {
@@ -90,7 +96,10 @@ describe('putMonthlyData', () => {
     const expense = { year: 2026, month: 7, userId: 'u1' } as Expense;
     await putMonthlyData({ expense });
 
-    expect(update).toHaveBeenCalledWith({ amountCad: 150, amountUsd: 20 });
+    expect(update).toHaveBeenCalledWith(
+      { amountCad: 150, amountUsd: 20 },
+      { transaction: undefined }
+    );
     expect(destroy).not.toHaveBeenCalled();
   });
 
@@ -104,12 +113,15 @@ describe('putMonthlyData', () => {
     const expense = { year: 2026, month: 7, userId: 'u1' } as Expense;
     await putMonthlyData({ expense });
 
-    expect(createSpy).toHaveBeenCalledWith({
-      type: MonthlyDataTypes.Expense,
-      amountCad: 0,
-      amountUsd: 30,
-      yearMonth: '2026-7',
-      userId: 'u1',
-    });
+    expect(createSpy).toHaveBeenCalledWith(
+      {
+        type: MonthlyDataTypes.Expense,
+        amountCad: 0,
+        amountUsd: 30,
+        yearMonth: '2026-7',
+        userId: 'u1',
+      },
+      { transaction: undefined }
+    );
   });
 });
