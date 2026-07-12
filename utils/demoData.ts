@@ -1,3 +1,4 @@
+import { sequelize } from '../config/database';
 import { Currency, Expense } from '../models/Expense';
 import { IncomeEntry } from '../models/IncomeEntry';
 import { RecurringExpense } from '../models/RecurringExpense';
@@ -61,61 +62,68 @@ export const formatDemoDate = (year: number, month: number, day: number) =>
   `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
 export const resetDemoUserData = async (userId: string) => {
-  await Promise.all([
-    Expense.destroy({ where: { userId } }),
-    IncomeEntry.destroy({ where: { userId } }),
-    RecurringExpense.destroy({ where: { userId } }),
-    RecurringIncomeEntry.destroy({ where: { userId } }),
-    MonthlyData.destroy({ where: { userId } }),
-  ]);
+  await sequelize.transaction(async (transaction) => {
+    await Promise.all([
+      Expense.destroy({ where: { userId }, transaction }),
+      IncomeEntry.destroy({ where: { userId }, transaction }),
+      RecurringExpense.destroy({ where: { userId }, transaction }),
+      RecurringIncomeEntry.destroy({ where: { userId }, transaction }),
+      MonthlyData.destroy({ where: { userId }, transaction }),
+    ]);
 
-  const months = getLastNMonths(6);
+    const months = getLastNMonths(6);
 
-  for (const { year, month } of months) {
-    const expenseCount = Math.floor(Math.random() * 4) + 6;
-    for (let i = 0; i < expenseCount; i++) {
-      const template = randomItem(EXPENSE_TEMPLATES);
-      const { id: _discardId, ...expenseObject } = createExpenseObject(
-        {
-          category: template.category,
-          amount: String(randomBetween(template.min, template.max)),
-          account: randomItem(ACCOUNTS),
-          description: template.description,
-          datePosted: formatDemoDate(year, month, randomDay()),
-          id: '',
-          currency: Math.random() > 0.3 ? Currency.CAD : Currency.USD,
-        },
-        userId
-      );
+    for (const { year, month } of months) {
+      const expenseCount = Math.floor(Math.random() * 4) + 6;
+      for (let i = 0; i < expenseCount; i++) {
+        const template = randomItem(EXPENSE_TEMPLATES);
+        const { id: _discardId, ...expenseObject } = createExpenseObject(
+          {
+            category: template.category,
+            amount: String(randomBetween(template.min, template.max)),
+            account: randomItem(ACCOUNTS),
+            description: template.description,
+            datePosted: formatDemoDate(year, month, randomDay()),
+            id: '',
+            currency: Math.random() > 0.3 ? Currency.CAD : Currency.USD,
+          },
+          userId
+        );
 
-      const expense = await Expense.create(expenseObject);
-      await postExpenseMonthlyData({ expense });
+        const expense = await Expense.create(expenseObject, { transaction });
+        await postExpenseMonthlyData({ expense, transaction });
+      }
+
+      for (const template of INCOME_TEMPLATES) {
+        const incomeObject = createIncomeEntryObject(
+          {
+            date: formatDemoDate(year, month, randomDay()),
+            description: template.description,
+            category: template.category,
+            amount: String(randomBetween(template.min, template.max)),
+          },
+          userId
+        );
+
+        const incomeEntry = await IncomeEntry.create(
+          {
+            ...incomeObject,
+            currency: 'CAD',
+          },
+          { transaction }
+        );
+        await postIncomeMonthlyData({ incomeEntry, transaction });
+      }
     }
 
-    for (const template of INCOME_TEMPLATES) {
-      const incomeObject = createIncomeEntryObject(
-        {
-          date: formatDemoDate(year, month, randomDay()),
-          description: template.description,
-          category: template.category,
-          amount: String(randomBetween(template.min, template.max)),
-        },
-        userId
-      );
+    await RecurringExpense.bulkCreate(
+      RECURRING_EXPENSE_TEMPLATES.map((template) => ({ ...template, userId })),
+      { transaction }
+    );
 
-      const incomeEntry = await IncomeEntry.create({
-        ...incomeObject,
-        currency: 'CAD',
-      });
-      await postIncomeMonthlyData({ incomeEntry });
-    }
-  }
-
-  await RecurringExpense.bulkCreate(
-    RECURRING_EXPENSE_TEMPLATES.map((template) => ({ ...template, userId }))
-  );
-
-  await RecurringIncomeEntry.bulkCreate(
-    RECURRING_INCOME_TEMPLATES.map((template) => ({ ...template, userId }))
-  );
+    await RecurringIncomeEntry.bulkCreate(
+      RECURRING_INCOME_TEMPLATES.map((template) => ({ ...template, userId })),
+      { transaction }
+    );
+  });
 };

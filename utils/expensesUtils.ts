@@ -1,4 +1,5 @@
 import { getMonth, getYear, parseISO } from 'date-fns';
+import { Transaction } from 'sequelize';
 import { Currency, Expense } from '../models/Expense';
 import { MonthlyData, MonthlyDataTypes } from '../models/MonthlyData';
 import { capitalizeWords } from './common';
@@ -28,43 +29,61 @@ export const createExpenseObject = (body: ExpenseBody, userId: string | null) =>
   };
 };
 
-export const postMonthlyData = async ({ expense }: { expense: Expense }) => {
+export const postMonthlyData = async ({
+  expense,
+  transaction,
+}: {
+  expense: Expense;
+  transaction?: Transaction;
+}) => {
   const { amount, year, month, currency, userId } = expense;
   const yearMonth = `${year}-${month}`;
   const parsedAmount = parseFloat(amount);
 
   const monthlyData = await MonthlyData.findOne({
     where: { yearMonth, type: MonthlyDataTypes.Expense, userId },
+    transaction,
   });
 
   if (monthlyData) {
     if (currency === Currency.CAD) {
-      await monthlyData.increment('amountCad', { by: parsedAmount });
+      await monthlyData.increment('amountCad', { by: parsedAmount, transaction });
     } else if (currency === Currency.USD) {
-      await monthlyData.increment('amountUsd', { by: parsedAmount });
+      await monthlyData.increment('amountUsd', { by: parsedAmount, transaction });
     }
     return;
   }
 
-  await MonthlyData.create({
-    type: MonthlyDataTypes.Expense,
-    amountCad: currency === Currency.CAD ? parsedAmount : 0,
-    amountUsd: currency === Currency.USD ? parsedAmount : 0,
-    yearMonth,
-    userId,
-  });
+  await MonthlyData.create(
+    {
+      type: MonthlyDataTypes.Expense,
+      amountCad: currency === Currency.CAD ? parsedAmount : 0,
+      amountUsd: currency === Currency.USD ? parsedAmount : 0,
+      yearMonth,
+      userId,
+    },
+    { transaction }
+  );
 };
 
-export const putMonthlyData = async ({ expense }: { expense: Expense }) => {
+export const putMonthlyData = async ({
+  expense,
+  transaction,
+}: {
+  expense: Expense;
+  transaction?: Transaction;
+}) => {
   const { year, month, userId } = expense;
   const yearMonth = `${year}-${month}`;
 
   const monthlyData = await MonthlyData.findOne({
     where: { yearMonth, type: MonthlyDataTypes.Expense, userId },
+    transaction,
   });
 
   const allExpensesThatMonth = await Expense.findAll({
     where: { year, month, userId },
+    transaction,
   });
 
   const totalAmountCad = allExpensesThatMonth.reduce((acc, entry) => {
@@ -77,22 +96,28 @@ export const putMonthlyData = async ({ expense }: { expense: Expense }) => {
 
   if (monthlyData) {
     if (totalAmountCad === 0 && totalAmountUsd === 0) {
-      await monthlyData.destroy();
+      await monthlyData.destroy({ transaction });
       return;
     }
 
-    await monthlyData.update({
-      amountCad: totalAmountCad,
-      amountUsd: totalAmountUsd,
-    });
+    await monthlyData.update(
+      {
+        amountCad: totalAmountCad,
+        amountUsd: totalAmountUsd,
+      },
+      { transaction }
+    );
     return;
   }
 
-  await MonthlyData.create({
-    type: MonthlyDataTypes.Expense,
-    amountCad: totalAmountCad,
-    amountUsd: totalAmountUsd,
-    yearMonth,
-    userId,
-  });
+  await MonthlyData.create(
+    {
+      type: MonthlyDataTypes.Expense,
+      amountCad: totalAmountCad,
+      amountUsd: totalAmountUsd,
+      yearMonth,
+      userId,
+    },
+    { transaction }
+  );
 };
