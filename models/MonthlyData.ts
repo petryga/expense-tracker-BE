@@ -13,6 +13,7 @@ export class MonthlyData extends Model {
   declare amountUsd: number;
   declare yearMonth: string;
   declare month: number;
+  declare userId: string;
 }
 
 MonthlyData.init(
@@ -41,6 +42,10 @@ MonthlyData.init(
     yearMonth: {
       type: DataTypes.STRING,
       allowNull: false,
+    },
+    userId: {
+      type: DataTypes.UUID,
+      allowNull: true,
     },
     createdAt: {
       type: DataTypes.DATE,

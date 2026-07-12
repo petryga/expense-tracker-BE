@@ -13,7 +13,7 @@ interface ExpenseBody {
   currency: Currency | '';
 }
 
-export const createExpenseObject = (body: ExpenseBody) => {
+export const createExpenseObject = (body: ExpenseBody, userId: string | null) => {
   const { description, datePosted } = body;
   const date = parseISO(datePosted);
 
@@ -24,16 +24,17 @@ export const createExpenseObject = (body: ExpenseBody) => {
     year,
     month,
     description: capitalizeWords(description),
+    userId,
   };
 };
 
 export const postMonthlyData = async ({ expense }: { expense: Expense }) => {
-  const { amount, year, month, currency } = expense;
+  const { amount, year, month, currency, userId } = expense;
   const yearMonth = `${year}-${month}`;
   const parsedAmount = parseFloat(amount);
 
   const monthlyData = await MonthlyData.findOne({
-    where: { yearMonth, type: MonthlyDataTypes.Expense },
+    where: { yearMonth, type: MonthlyDataTypes.Expense, userId },
   });
 
   if (monthlyData) {
@@ -50,19 +51,20 @@ export const postMonthlyData = async ({ expense }: { expense: Expense }) => {
     amountCad: currency === Currency.CAD ? parsedAmount : 0,
     amountUsd: currency === Currency.USD ? parsedAmount : 0,
     yearMonth,
+    userId,
   });
 };
 
 export const putMonthlyData = async ({ expense }: { expense: Expense }) => {
-  const { year, month } = expense;
+  const { year, month, userId } = expense;
   const yearMonth = `${year}-${month}`;
 
   const monthlyData = await MonthlyData.findOne({
-    where: { yearMonth, type: MonthlyDataTypes.Expense },
+    where: { yearMonth, type: MonthlyDataTypes.Expense, userId },
   });
 
   const allExpensesThatMonth = await Expense.findAll({
-    where: { year, month },
+    where: { year, month, userId },
   });
 
   const totalAmountCad = allExpensesThatMonth.reduce((acc, entry) => {
@@ -91,5 +93,6 @@ export const putMonthlyData = async ({ expense }: { expense: Expense }) => {
     amountCad: totalAmountCad,
     amountUsd: totalAmountUsd,
     yearMonth,
+    userId,
   });
 };

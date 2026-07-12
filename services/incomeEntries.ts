@@ -9,9 +9,10 @@ import { handleError } from '../utils/common';
 
 const router = Router();
 
-router.get('/', async (_, res) => {
+router.get('/', async (req, res) => {
   try {
     const incomeEntries = await IncomeEntry.findAll({
+      where: { userId: req.userId },
       order: [
         ['date', 'DESC'],
         ['category', 'ASC'],
@@ -26,8 +27,9 @@ router.get('/', async (_, res) => {
 
 router.post('/', async (req, res) => {
   try {
+    const userId = req.userId;
     if (Array.isArray(req.body)) {
-      const incomeEntries = req.body.map(createIncomeEntryObject);
+      const incomeEntries = req.body.map((item) => createIncomeEntryObject(item, userId));
 
       const newIncomeEntries = await IncomeEntry.bulkCreate(incomeEntries);
 
@@ -38,7 +40,7 @@ router.post('/', async (req, res) => {
       return;
     }
 
-    const income = createIncomeEntryObject(req.body);
+    const income = createIncomeEntryObject(req.body, userId);
     const newIncomeEntry = await IncomeEntry.create(income);
     await postMonthlyData({ incomeEntry: newIncomeEntry });
 
@@ -55,12 +57,12 @@ router.put('/:id', async (req, res) => {
   }
 
   try {
-    const incomeEntry = await IncomeEntry.findByPk(id);
+    const incomeEntry = await IncomeEntry.findOne({ where: { id, userId: req.userId } });
     if (!incomeEntry) {
       return res.status(404).json({ error: 'Income entry not found' });
     }
 
-    const updatedIncomeEntry = await incomeEntry.update(req.body);
+    const updatedIncomeEntry = await incomeEntry.update({ ...req.body, userId: req.userId });
     await putMonthlyData({ incomeEntry: updatedIncomeEntry });
 
     res.json(updatedIncomeEntry);
@@ -76,7 +78,7 @@ router.delete('/:id', async (req, res) => {
   }
 
   try {
-    const incomeEntry = await IncomeEntry.findByPk(id);
+    const incomeEntry = await IncomeEntry.findOne({ where: { id, userId: req.userId } });
     if (!incomeEntry) {
       return res.status(404).json({ error: 'Income entry not found' });
     }
