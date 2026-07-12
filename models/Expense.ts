@@ -16,6 +16,7 @@ export class Expense extends Model {
   declare month: number | null;
   declare datePosted: string;
   declare currency: Currency | '';
+  declare userId: string;
 }
 
 Expense.init(
@@ -67,6 +68,10 @@ Expense.init(
       type: DataTypes.STRING,
       allowNull: false,
       defaultValue: Currency.CAD,
+    },
+    userId: {
+      type: DataTypes.UUID,
+      allowNull: true,
     },
   },
   {

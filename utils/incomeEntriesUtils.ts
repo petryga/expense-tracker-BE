@@ -10,24 +10,25 @@ interface IncomeEntryBody {
   amount: string;
 }
 
-export const createIncomeEntryObject = (body: IncomeEntryBody) => {
+export const createIncomeEntryObject = (body: IncomeEntryBody, userId: string | null) => {
   const { description } = body;
 
   return {
     ...body,
     description: capitalizeWords(description),
+    userId,
   };
 };
 
 export const postMonthlyData = async ({ incomeEntry }: { incomeEntry: IncomeEntry }) => {
-  const { amount, date, currency } = incomeEntry;
+  const { amount, date, currency, userId } = incomeEntry;
   const parsedAmount = parseFloat(amount);
   const year = date.split('-')[0];
   const month = date.split('-')[1];
 
   const yearMonth = `${year}-${month}`;
   const monthlyData = await MonthlyData.findOne({
-    where: { yearMonth, type: MonthlyDataTypes.Income },
+    where: { yearMonth, type: MonthlyDataTypes.Income, userId },
   });
 
   if (monthlyData) {
@@ -44,22 +45,23 @@ export const postMonthlyData = async ({ incomeEntry }: { incomeEntry: IncomeEntr
     amountCad: currency === Currency.CAD ? parsedAmount : 0,
     amountUsd: currency === Currency.USD ? parsedAmount : 0,
     yearMonth,
+    userId,
   });
 };
 
 export const putMonthlyData = async ({ incomeEntry }: { incomeEntry: IncomeEntry }) => {
-  const { date } = incomeEntry;
+  const { date, userId } = incomeEntry;
   const year = date.split('-')[0];
   const month = date.split('-')[1];
 
   const yearMonth = `${year}-${month}`;
 
   const monthlyData = await MonthlyData.findOne({
-    where: { yearMonth, type: MonthlyDataTypes.Income },
+    where: { yearMonth, type: MonthlyDataTypes.Income, userId },
   });
 
   const allIncomeEntriesThatMonth = await IncomeEntry.findAll({
-    where: { date: { [Op.startsWith]: yearMonth } },
+    where: { date: { [Op.startsWith]: yearMonth }, userId },
   });
 
   const totalAmountCad = allIncomeEntriesThatMonth.reduce((acc, entry) => {
@@ -88,5 +90,6 @@ export const putMonthlyData = async ({ incomeEntry }: { incomeEntry: IncomeEntry
     amountCad: totalAmountCad,
     amountUsd: totalAmountUsd,
     yearMonth,
+    userId,
   });
 };

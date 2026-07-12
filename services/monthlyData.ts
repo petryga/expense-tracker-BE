@@ -3,8 +3,8 @@ import { MonthlyData } from '../models/MonthlyData';
 
 const router = Router();
 
-router.get('/', async (_, res) => {
-  const monthlyData = await MonthlyData.findAll();
+router.get('/', async (req, res) => {
+  const monthlyData = await MonthlyData.findAll({ where: { userId: req.userId } });
 
   if (!monthlyData) {
     res.status(404).json({ error: 'Monthly data not found' });

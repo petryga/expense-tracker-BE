@@ -7,7 +7,7 @@ const router = Router();
 
 router.get('/', async (req, res) => {
   try {
-    const expenses = await Expense.findAll();
+    const expenses = await Expense.findAll({ where: { userId: req.userId } });
 
     const csvWriter = createObjectCsvWriter({
       path: 'output.csv',
