@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { Currency, Expense } from '../models/Expense';
 import { createExpenseObject, putMonthlyData, postMonthlyData } from '../utils/expensesUtils';
 import { Op } from 'sequelize';
+import { sequelize } from '../config/database';
 import { handleError } from '../utils/common';
 
 
@@ -122,18 +123,25 @@ router.post('/', async (req, res) => {
     if (Array.isArray(req.body)) {
       const expenses = req.body.map((item) => createExpenseObject(item, userId));
 
-      const newExpenses = await Expense.bulkCreate(expenses);
+      const newExpenses = await sequelize.transaction(async (transaction) => {
+        const created = await Expense.bulkCreate(expenses, { transaction });
 
-      for (const expense of newExpenses) {
-        await postMonthlyData({ expense });
-      }
+        for (const expense of created) {
+          await postMonthlyData({ expense, transaction });
+        }
+        return created;
+      });
+
       res.status(201).json(newExpenses);
       return;
     }
 
     const expense = createExpenseObject(req.body, userId);
-    const newExpense = await Expense.create(expense);
-    await postMonthlyData({ expense: newExpense });
+    const newExpense = await sequelize.transaction(async (transaction) => {
+      const created = await Expense.create(expense, { transaction });
+      await postMonthlyData({ expense: created, transaction });
+      return created;
+    });
 
     res.status(201).json(newExpense);
   } catch (error: any) {
@@ -160,16 +168,19 @@ router.delete('/', async (req, res) => {
       return res.status(404).json({ error: 'Expenses not found' });
     }
 
-    await Expense.destroy({
-      where: {
-        id: ids,
-        userId,
-      },
-    });
+    await sequelize.transaction(async (transaction) => {
+      await Expense.destroy({
+        where: {
+          id: ids,
+          userId,
+        },
+        transaction,
+      });
 
-    for (const expense of expenses) {
-      await putMonthlyData({ expense });
-    }
+      for (const expense of expenses) {
+        await putMonthlyData({ expense, transaction });
+      }
+    });
     res.status(204).send();
   } catch (error: any) {
     handleError(res, error, 'Failed to delete expenses');
@@ -188,8 +199,10 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Expense not found' });
     }
 
-    await expense.destroy();
-    await putMonthlyData({ expense });
+    await sequelize.transaction(async (transaction) => {
+      await expense.destroy({ transaction });
+      await putMonthlyData({ expense, transaction });
+    });
     res.status(204).end();
   } catch (error: any) {
     handleError(res, error, 'Failed to delete expense');
@@ -210,8 +223,10 @@ router.put('/:id', async (req, res) => {
     }
 
     const updatedExpenseData = createExpenseObject(req.body, req.userId);
-    await expense.update(updatedExpenseData);
-    await putMonthlyData({ expense });
+    await sequelize.transaction(async (transaction) => {
+      await expense.update(updatedExpenseData, { transaction });
+      await putMonthlyData({ expense, transaction });
+    });
     res.status(200).json(expense);
   } catch (error: any) {
     handleError(res, error, 'Failed to update expense');

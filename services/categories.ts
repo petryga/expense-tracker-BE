@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { Op } from 'sequelize';
 import { Category } from '../models/Category';
 import { CategoryBudget } from '../models/CategoryBudget';
+import { sequelize } from '../config/database';
 import { handleError } from '../utils/common';
 
 const router = Router();
@@ -89,8 +90,10 @@ router.delete('/:id', async (req, res) => {
     });
     const idsToRemove = [id, ...subcategories.map((subcategory) => subcategory.id)];
 
-    await CategoryBudget.destroy({ where: { categoryId: idsToRemove } });
-    await Category.destroy({ where: { id: idsToRemove } });
+    await sequelize.transaction(async (transaction) => {
+      await CategoryBudget.destroy({ where: { categoryId: idsToRemove }, transaction });
+      await Category.destroy({ where: { id: idsToRemove }, transaction });
+    });
 
     res.status(204).end();
   } catch (error) {
