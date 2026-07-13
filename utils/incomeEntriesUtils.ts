@@ -1,4 +1,3 @@
-import { capitalizeWords } from './common.js';
 import { MonthlyData, MonthlyDataTypes } from '../models/MonthlyData.js';
 import { Currency, IncomeEntry } from '../models/IncomeEntry.js';
 import { Op, Transaction } from 'sequelize';
@@ -11,11 +10,8 @@ interface IncomeEntryBody {
 }
 
 export const createIncomeEntryObject = (body: IncomeEntryBody, userId: string | null) => {
-  const { description } = body;
-
   return {
     ...body,
-    description: capitalizeWords(description),
     userId,
   };
 };
