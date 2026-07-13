@@ -6,6 +6,7 @@ import { IncomeEntry } from '../models/IncomeEntry.js';
 import { RecurringExpense } from '../models/RecurringExpense.js';
 import { RecurringIncomeEntry } from '../models/RecurringIncomeEntry.js';
 import { MonthlyData } from '../models/MonthlyData.js';
+import { Account } from '../models/Account.js';
 
 const USER_ID = 'demo-user-123';
 // resetDemoUserData runs everything inside sequelize.transaction; the
@@ -39,6 +40,9 @@ beforeEach(() => {
   vi.spyOn(MonthlyData, 'destroy').mockResolvedValue(0);
   vi.spyOn(MonthlyData, 'findOne').mockResolvedValue(null as any);
   vi.spyOn(MonthlyData, 'create').mockResolvedValue({} as any);
+
+  vi.spyOn(Account, 'destroy').mockResolvedValue(0);
+  vi.spyOn(Account, 'bulkCreate').mockResolvedValue([] as any);
 });
 
 afterEach(() => {
@@ -46,7 +50,7 @@ afterEach(() => {
 });
 
 describe('resetDemoUserData', () => {
-  it('wipes all five tables scoped to the given userId before reseeding', async () => {
+  it('wipes all six tables scoped to the given userId before reseeding', async () => {
     await resetDemoUserData(USER_ID);
 
     expect(Expense.destroy).toHaveBeenCalledWith({
@@ -66,6 +70,10 @@ describe('resetDemoUserData', () => {
       transaction: FAKE_TRANSACTION,
     });
     expect(MonthlyData.destroy).toHaveBeenCalledWith({
+      where: { userId: USER_ID },
+      transaction: FAKE_TRANSACTION,
+    });
+    expect(Account.destroy).toHaveBeenCalledWith({
       where: { userId: USER_ID },
       transaction: FAKE_TRANSACTION,
     });
@@ -96,5 +104,18 @@ describe('resetDemoUserData', () => {
     const recurringIncome = vi.mocked(RecurringIncomeEntry.bulkCreate).mock.calls[0][0] as any[];
     expect(recurringIncome).toHaveLength(2);
     expect(recurringIncome.every((row) => row.userId === USER_ID)).toBe(true);
+  });
+
+  it('seeds the demo accounts for userId', async () => {
+    await resetDemoUserData(USER_ID);
+
+    expect(Account.bulkCreate).toHaveBeenCalledOnce();
+    const accounts = vi.mocked(Account.bulkCreate).mock.calls[0][0] as any[];
+    expect(accounts).toHaveLength(3);
+    expect(accounts.every((row) => row.userId === USER_ID)).toBe(true);
+    expect(accounts.every((row) => row.isDefault === false)).toBe(true);
+    expect(accounts.map((row) => row.name).sort()).toEqual(
+      ['Acme Checking', 'Acme Credit Card', 'Globex Savings'].sort()
+    );
   });
 });

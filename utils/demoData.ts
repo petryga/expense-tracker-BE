@@ -4,10 +4,20 @@ import { IncomeEntry } from '../models/IncomeEntry.js';
 import { RecurringExpense } from '../models/RecurringExpense.js';
 import { RecurringIncomeEntry } from '../models/RecurringIncomeEntry.js';
 import { MonthlyData } from '../models/MonthlyData.js';
+import { Account } from '../models/Account.js';
 import { createExpenseObject, postMonthlyData as postExpenseMonthlyData } from './expensesUtils.js';
 import { createIncomeEntryObject, postMonthlyData as postIncomeMonthlyData } from './incomeEntriesUtils.js';
 
-const ACCOUNTS = ['TD Savings', 'Amex', 'BofA Debit', 'Cash'];
+// Fictional accounts, not the real account names anyone using this app
+// actually has - "Cash" alone comes from the global default account seed,
+// not from here.
+const ACCOUNT_CURRENCIES: Record<string, string> = {
+  'Acme Checking': 'CAD',
+  'Acme Credit Card': 'USD',
+  'Globex Savings': 'USD',
+};
+
+const ACCOUNTS = Object.keys(ACCOUNT_CURRENCIES);
 
 const EXPENSE_TEMPLATES: { category: string; description: string; min: number; max: number }[] = [
   { category: 'Rent', description: 'Monthly Rent', min: 1400, max: 1600 },
@@ -32,9 +42,9 @@ const INCOME_TEMPLATES: { category: string; description: string; min: number; ma
 ];
 
 const RECURRING_EXPENSE_TEMPLATES = [
-  { account: 'Amex', description: 'Streaming Subscription', category: 'Subscriptions', currency: 'USD', amount: 15.99, dayOfMonth: 12 },
-  { account: 'TD Savings', description: 'Gym Membership', category: 'Entertainment', currency: 'CAD', amount: 45, dayOfMonth: 1 },
-  { account: 'TD Savings', description: 'Account Fee', category: 'Financial Fees', currency: 'CAD', amount: 4.95, dayOfMonth: 28 },
+  { account: 'Acme Credit Card', description: 'Streaming Subscription', category: 'Subscriptions', currency: 'USD', amount: 15.99, dayOfMonth: 12 },
+  { account: 'Acme Checking', description: 'Gym Membership', category: 'Entertainment', currency: 'CAD', amount: 45, dayOfMonth: 1 },
+  { account: 'Acme Checking', description: 'Account Fee', category: 'Financial Fees', currency: 'CAD', amount: 4.95, dayOfMonth: 28 },
 ];
 
 const RECURRING_INCOME_TEMPLATES = [
@@ -69,6 +79,7 @@ export const resetDemoUserData = async (userId: string) => {
       RecurringExpense.destroy({ where: { userId }, transaction }),
       RecurringIncomeEntry.destroy({ where: { userId }, transaction }),
       MonthlyData.destroy({ where: { userId }, transaction }),
+      Account.destroy({ where: { userId }, transaction }),
     ]);
 
     const months = getLastNMonths(6);
@@ -123,6 +134,16 @@ export const resetDemoUserData = async (userId: string) => {
 
     await RecurringIncomeEntry.bulkCreate(
       RECURRING_INCOME_TEMPLATES.map((template) => ({ ...template, userId })),
+      { transaction }
+    );
+
+    await Account.bulkCreate(
+      ACCOUNTS.map((name) => ({
+        name,
+        currency: ACCOUNT_CURRENCIES[name],
+        isDefault: false,
+        userId,
+      })),
       { transaction }
     );
   });
