@@ -1,11 +1,11 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { resetDemoUserData } from './demoData';
-import { sequelize } from '../config/database';
-import { Expense } from '../models/Expense';
-import { IncomeEntry } from '../models/IncomeEntry';
-import { RecurringExpense } from '../models/RecurringExpense';
-import { RecurringIncomeEntry } from '../models/RecurringIncomeEntry';
-import { MonthlyData } from '../models/MonthlyData';
+import { resetDemoUserData } from './demoData.js';
+import { sequelize } from '../config/database.js';
+import { Expense } from '../models/Expense.js';
+import { IncomeEntry } from '../models/IncomeEntry.js';
+import { RecurringExpense } from '../models/RecurringExpense.js';
+import { RecurringIncomeEntry } from '../models/RecurringIncomeEntry.js';
+import { MonthlyData } from '../models/MonthlyData.js';
 
 const USER_ID = 'demo-user-123';
 // resetDemoUserData runs everything inside sequelize.transaction; the

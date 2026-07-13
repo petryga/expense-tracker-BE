@@ -5,7 +5,7 @@ import {
   randomBetween,
   randomDay,
   randomItem,
-} from './demoData';
+} from './demoData.js';
 
 afterEach(() => {
   vi.restoreAllMocks();

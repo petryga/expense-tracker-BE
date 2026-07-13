@@ -1,12 +1,13 @@
 {
   "ts-node": {
-    "compiler": "ttypescript"
+    "esm": true
   },
   "compilerOptions": {
     "outDir": "dist",
     "lib": ["es2020", "dom"],
-    "module": "commonjs",
-    "target": "es2019",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "es2020",
     "inlineSourceMap": true,
     "esModuleInterop": true,
     "noEmitOnError": true,
@@ -16,5 +17,6 @@
     "forceConsistentCasingInFileNames": true,
     "noErrorTruncation": true,
     "plugins": []
-  }
+  },
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createExpenseObject } from './expensesUtils';
-import { Currency } from '../models/Expense';
+import { createExpenseObject } from './expensesUtils.js';
+import { Currency } from '../models/Expense.js';
 
 const baseBody = {
   category: 'Groceries',

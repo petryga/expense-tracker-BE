@@ -1,15 +1,15 @@
-import { sequelize as sequelizeConfig } from './config/database';
+import { sequelize as sequelizeConfig } from './config/database.js';
 import express from 'express';
 import cors from 'cors';
-import expensesRouter from './services/expenses';
-import monthlyData from './services/monthlyData';
-import incomeEntries from './services/incomeEntries';
-import exportCsV from './services/exportCsv';
-import recurringExpenses from './services/recurringExpenses';
-import recurringIncomeEntries from './services/recurringIncomeEntries';
-import categories from './services/categories';
-import demo from './services/demo';
-import { requireAuth } from './middleware/auth';
+import expensesRouter from './services/expenses.js';
+import monthlyData from './services/monthlyData.js';
+import incomeEntries from './services/incomeEntries.js';
+import exportCsV from './services/exportCsv.js';
+import recurringExpenses from './services/recurringExpenses.js';
+import recurringIncomeEntries from './services/recurringIncomeEntries.js';
+import categories from './services/categories.js';
+import demo from './services/demo.js';
+import { requireAuth } from './middleware/auth.js';
 
 const app = express();
 const port = process.env.PORT || 3000;

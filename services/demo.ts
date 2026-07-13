@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { resetDemoUserData } from '../utils/demoData';
-import { handleError } from '../utils/common';
+import { resetDemoUserData } from '../utils/demoData.js';
+import { handleError } from '../utils/common.js';
 
 const router = Router();
 

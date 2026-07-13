@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
-import { postMonthlyData, putMonthlyData } from './expensesUtils';
-import { MonthlyData, MonthlyDataTypes } from '../models/MonthlyData';
-import { Currency, Expense } from '../models/Expense';
+import { postMonthlyData, putMonthlyData } from './expensesUtils.js';
+import { MonthlyData, MonthlyDataTypes } from '../models/MonthlyData.js';
+import { Currency, Expense } from '../models/Expense.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
