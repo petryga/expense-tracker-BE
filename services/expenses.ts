@@ -144,7 +144,7 @@ router.post('/', async (req, res) => {
     });
 
     res.status(201).json(newExpense);
-  } catch (error: any) {
+  } catch (error) {
     handleError(res, error, 'Failed to create new expense');
   }
 });
@@ -182,7 +182,7 @@ router.delete('/', async (req, res) => {
       }
     });
     res.status(204).send();
-  } catch (error: any) {
+  } catch (error) {
     handleError(res, error, 'Failed to delete expenses');
   }
 });
@@ -204,7 +204,7 @@ router.delete('/:id', async (req, res) => {
       await putMonthlyData({ expense, transaction });
     });
     res.status(204).end();
-  } catch (error: any) {
+  } catch (error) {
     handleError(res, error, 'Failed to delete expense');
   }
 });
@@ -228,7 +228,7 @@ router.put('/:id', async (req, res) => {
       await putMonthlyData({ expense, transaction });
     });
     res.status(200).json(expense);
-  } catch (error: any) {
+  } catch (error) {
     handleError(res, error, 'Failed to update expense');
   }
 });
