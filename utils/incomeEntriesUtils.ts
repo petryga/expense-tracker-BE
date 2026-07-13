@@ -1,6 +1,6 @@
-import { capitalizeWords } from './common';
-import { MonthlyData, MonthlyDataTypes } from '../models/MonthlyData';
-import { Currency, IncomeEntry } from '../models/IncomeEntry';
+import { capitalizeWords } from './common.js';
+import { MonthlyData, MonthlyDataTypes } from '../models/MonthlyData.js';
+import { Currency, IncomeEntry } from '../models/IncomeEntry.js';
 import { Op, Transaction } from 'sequelize';
 
 interface IncomeEntryBody {

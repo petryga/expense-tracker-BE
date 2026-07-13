@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { Op } from 'sequelize';
-import { Category } from '../models/Category';
-import { CategoryBudget } from '../models/CategoryBudget';
-import { sequelize } from '../config/database';
-import { handleError } from '../utils/common';
+import { Category } from '../models/Category.js';
+import { CategoryBudget } from '../models/CategoryBudget.js';
+import { sequelize } from '../config/database.js';
+import { handleError } from '../utils/common.js';
 
 const router = Router();
 

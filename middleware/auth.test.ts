@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { requireAuth } from './auth';
+import { requireAuth } from './auth.js';
 import { jwtVerify } from 'jose';
 
 vi.mock('jose', () => ({

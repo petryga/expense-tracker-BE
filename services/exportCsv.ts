@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { Currency, Expense } from '../models/Expense';
+import { Currency, Expense } from '../models/Expense.js';
 import { createObjectCsvWriter } from 'csv-writer';
-import { formatDate } from '../utils/exportUtils';
+import { formatDate } from '../utils/exportUtils.js';
 
 const router = Router();
 
