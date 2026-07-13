@@ -1,0 +1,15 @@
+# .github/workflows/keep-alive.yml
+name: Supabase Keep-Alive
+on:
+  schedule:
+    - cron: '0 9 */3 * *'  # every 3 days
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          curl -s -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/expenses?select=id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}"
