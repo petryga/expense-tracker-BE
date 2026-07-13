@@ -8,6 +8,7 @@ import exportCsV from './services/exportCsv.js';
 import recurringExpenses from './services/recurringExpenses.js';
 import recurringIncomeEntries from './services/recurringIncomeEntries.js';
 import categories from './services/categories.js';
+import accounts from './services/accounts.js';
 import demo from './services/demo.js';
 import { requireAuth } from './middleware/auth.js';
 
@@ -37,6 +38,7 @@ app.use('/export', exportCsV);
 app.use('/recurringExpenses', recurringExpenses);
 app.use('/recurringIncome', recurringIncomeEntries);
 app.use('/categories', categories);
+app.use('/accounts', accounts);
 app.use('/demo', demo);
 
 sequelizeConfig

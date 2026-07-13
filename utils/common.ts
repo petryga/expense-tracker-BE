@@ -9,7 +9,7 @@ export const handleError = (
   res: {
     status: (arg0: number) => { json: (arg0: { error: string }) => void };
   },
-  error: Error,
+  error: unknown,
   message: string
 ) => {
   console.error(message, error);

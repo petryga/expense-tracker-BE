@@ -13,7 +13,7 @@ router.post('/reset', async (req, res) => {
   try {
     await resetDemoUserData(req.userId);
     res.status(204).end();
-  } catch (error: any) {
+  } catch (error) {
     handleError(res, error, 'Failed to reset demo data');
   }
 });
