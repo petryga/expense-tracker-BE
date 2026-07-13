@@ -9,9 +9,9 @@ const baseBody = {
 };
 
 describe('createIncomeEntryObject', () => {
-  it('capitalizes the description', () => {
+  it('leaves the description unchanged', () => {
     const result = createIncomeEntryObject(baseBody, 'user-1');
-    expect(result.description).toBe('Salary');
+    expect(result.description).toBe('salary');
   });
 
   it('attaches the given userId', () => {

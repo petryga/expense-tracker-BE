@@ -1,23 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { capitalizeWords, handleError } from './common.js';
-
-describe('capitalizeWords', () => {
-  it('capitalizes each word in a multi-word string', () => {
-    expect(capitalizeWords('hello world')).toBe('Hello World');
-  });
-
-  it('normalizes mixed casing', () => {
-    expect(capitalizeWords('hELLO wORLD')).toBe('Hello World');
-  });
-
-  it('capitalizes a single word', () => {
-    expect(capitalizeWords('groceries')).toBe('Groceries');
-  });
-
-  it('returns an empty string unchanged', () => {
-    expect(capitalizeWords('')).toBe('');
-  });
-});
+import { handleError } from './common.js';
 
 describe('handleError', () => {
   it('logs the error and responds with a 400 and the given message', () => {

@@ -19,9 +19,9 @@ describe('createExpenseObject', () => {
     expect(result.month).toBe(7);
   });
 
-  it('capitalizes the description', () => {
+  it('leaves the description unchanged', () => {
     const result = createExpenseObject(baseBody, 'user-1');
-    expect(result.description).toBe('Grocery Run');
+    expect(result.description).toBe('grocery run');
   });
 
   it('attaches the given userId', () => {

@@ -2,7 +2,6 @@ import { getMonth, getYear, parseISO } from 'date-fns';
 import { Transaction } from 'sequelize';
 import { Currency, Expense } from '../models/Expense.js';
 import { MonthlyData, MonthlyDataTypes } from '../models/MonthlyData.js';
-import { capitalizeWords } from './common.js';
 
 interface ExpenseBody {
   category: string;
@@ -15,7 +14,7 @@ interface ExpenseBody {
 }
 
 export const createExpenseObject = (body: ExpenseBody, userId: string | null) => {
-  const { description, datePosted } = body;
+  const { datePosted } = body;
   const date = parseISO(datePosted);
 
   const year = getYear(date) || null;
@@ -24,7 +23,6 @@ export const createExpenseObject = (body: ExpenseBody, userId: string | null) =>
     ...body,
     year,
     month,
-    description: capitalizeWords(description),
     userId,
   };
 };
