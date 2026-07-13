@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { capitalizeWords, handleError } from './common';
+import { capitalizeWords, handleError } from './common.js';
 
 describe('capitalizeWords', () => {
   it('capitalizes each word in a multi-word string', () => {

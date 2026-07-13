@@ -1,11 +1,11 @@
-import { sequelize } from '../config/database';
-import { Currency, Expense } from '../models/Expense';
-import { IncomeEntry } from '../models/IncomeEntry';
-import { RecurringExpense } from '../models/RecurringExpense';
-import { RecurringIncomeEntry } from '../models/RecurringIncomeEntry';
-import { MonthlyData } from '../models/MonthlyData';
-import { createExpenseObject, postMonthlyData as postExpenseMonthlyData } from './expensesUtils';
-import { createIncomeEntryObject, postMonthlyData as postIncomeMonthlyData } from './incomeEntriesUtils';
+import { sequelize } from '../config/database.js';
+import { Currency, Expense } from '../models/Expense.js';
+import { IncomeEntry } from '../models/IncomeEntry.js';
+import { RecurringExpense } from '../models/RecurringExpense.js';
+import { RecurringIncomeEntry } from '../models/RecurringIncomeEntry.js';
+import { MonthlyData } from '../models/MonthlyData.js';
+import { createExpenseObject, postMonthlyData as postExpenseMonthlyData } from './expensesUtils.js';
+import { createIncomeEntryObject, postMonthlyData as postIncomeMonthlyData } from './incomeEntriesUtils.js';
 
 const ACCOUNTS = ['TD Savings', 'Amex', 'BofA Debit', 'Cash'];
 

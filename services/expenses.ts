@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import { Currency, Expense } from '../models/Expense';
-import { createExpenseObject, putMonthlyData, postMonthlyData } from '../utils/expensesUtils';
+import { Currency, Expense } from '../models/Expense.js';
+import { createExpenseObject, putMonthlyData, postMonthlyData } from '../utils/expensesUtils.js';
 import { Op } from 'sequelize';
-import { sequelize } from '../config/database';
-import { handleError } from '../utils/common';
+import { sequelize } from '../config/database.js';
+import { handleError } from '../utils/common.js';
 
 
 const router = Router();

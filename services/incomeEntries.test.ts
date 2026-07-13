@@ -1,9 +1,9 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import type { Request, Response } from 'express';
-import router from './incomeEntries';
-import { Currency, IncomeEntry } from '../models/IncomeEntry';
-import { MonthlyData } from '../models/MonthlyData';
-import { sequelize } from '../config/database';
+import router from './incomeEntries.js';
+import { Currency, IncomeEntry } from '../models/IncomeEntry.js';
+import { MonthlyData } from '../models/MonthlyData.js';
+import { sequelize } from '../config/database.js';
 
 // Express stores each router.<method>(path, handler) registration as a Layer
 // with a nested route.stack; pulling the raw handler out lets us exercise it

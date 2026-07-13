@@ -1,8 +1,8 @@
 import { getMonth, getYear, parseISO } from 'date-fns';
 import { Transaction } from 'sequelize';
-import { Currency, Expense } from '../models/Expense';
-import { MonthlyData, MonthlyDataTypes } from '../models/MonthlyData';
-import { capitalizeWords } from './common';
+import { Currency, Expense } from '../models/Expense.js';
+import { MonthlyData, MonthlyDataTypes } from '../models/MonthlyData.js';
+import { capitalizeWords } from './common.js';
 
 interface ExpenseBody {
   category: string;

@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { RecurringIncomeEntry } from '../models/RecurringIncomeEntry';
-import { handleError } from '../utils/common';
+import { RecurringIncomeEntry } from '../models/RecurringIncomeEntry.js';
+import { handleError } from '../utils/common.js';
 
 const router = Router();
 

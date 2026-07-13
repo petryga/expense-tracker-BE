@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createIncomeEntryObject } from './incomeEntriesUtils';
+import { createIncomeEntryObject } from './incomeEntriesUtils.js';
 
 const baseBody = {
   date: '2026-07-11',

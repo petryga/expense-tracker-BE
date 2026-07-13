@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { MonthlyData } from '../models/MonthlyData';
+import { MonthlyData } from '../models/MonthlyData.js';
 
 const router = Router();
 

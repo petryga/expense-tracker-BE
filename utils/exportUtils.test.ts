@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { formatDate } from './exportUtils';
+import { formatDate } from './exportUtils.js';
 
 describe('formatDate', () => {
   it('formats a mid-day UTC datetime string down to yyyy-MM-dd', () => {

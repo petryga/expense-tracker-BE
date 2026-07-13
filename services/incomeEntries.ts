@@ -1,12 +1,12 @@
 import { Router } from 'express';
-import { IncomeEntry } from '../models/IncomeEntry';
+import { IncomeEntry } from '../models/IncomeEntry.js';
 import {
   createIncomeEntryObject,
   postMonthlyData,
   putMonthlyData,
-} from '../utils/incomeEntriesUtils';
-import { sequelize } from '../config/database';
-import { handleError } from '../utils/common';
+} from '../utils/incomeEntriesUtils.js';
+import { sequelize } from '../config/database.js';
+import { handleError } from '../utils/common.js';
 
 const router = Router();
 
