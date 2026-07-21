@@ -3,15 +3,27 @@ import { Currency, IncomeEntry } from '../models/IncomeEntry.js';
 import { Op, Transaction } from 'sequelize';
 
 interface IncomeEntryBody {
+  id?: string;
   date: string;
   description: string;
   category: string;
   amount: string;
+  currency?: Currency | '';
 }
 
 export const createIncomeEntryObject = (body: IncomeEntryBody, userId: string | null) => {
+  // Explicit allow-list rather than `...body` — the FE assigns its own uuid
+  // client-side for optimistic UI, so `id` is a legitimate field to accept,
+  // but nothing else the client sends (e.g. a forged createdAt/updatedAt)
+  // should reach the database.
+  const { id, date, description, category, amount, currency } = body;
   return {
-    ...body,
+    id,
+    date,
+    description,
+    category,
+    amount,
+    currency,
     userId,
   };
 };

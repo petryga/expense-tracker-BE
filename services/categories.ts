@@ -55,6 +55,13 @@ router.put('/:id/budget', async (req, res) => {
   try {
     const { budget } = req.body;
 
+    const category = await Category.findOne({
+      where: { id, [Op.or]: [{ isDefault: true }, { userId: req.userId }] },
+    });
+    if (!category) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+
     const existing = await CategoryBudget.findOne({
       where: { categoryId: id, userId: req.userId },
     });

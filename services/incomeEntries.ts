@@ -72,7 +72,7 @@ router.put('/:id', async (req, res) => {
 
     const updatedIncomeEntry = await sequelize.transaction(async (transaction) => {
       const updated = await incomeEntry.update(
-        { ...req.body, userId: req.userId },
+        createIncomeEntryObject(req.body, req.userId),
         { transaction }
       );
       await putMonthlyData({ incomeEntry: updated, transaction });
