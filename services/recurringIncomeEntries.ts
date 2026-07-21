@@ -17,10 +17,19 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Explicit allow-list rather than `...req.body` — the FE assigns its own
+// uuid client-side for optimistic UI, so `id` is a legitimate field to
+// accept, but nothing else the client sends (e.g. a forged
+// createdAt/updatedAt) should reach the database.
+const pickRecurringIncomeFields = (body: Record<string, unknown>) => {
+  const { id, description, category, amount, currency } = body;
+  return { id, description, category, amount, currency };
+};
+
 router.post('/', async (req, res) => {
   try {
     const newRecurringIncomeEntry = await RecurringIncomeEntry.create({
-      ...req.body,
+      ...pickRecurringIncomeFields(req.body),
       userId: req.userId,
     });
 
@@ -45,7 +54,7 @@ router.put('/:id', async (req, res) => {
     }
 
     const updatedRecurringIncomeEntry = await recurringIncomeEntry.update({
-      ...req.body,
+      ...pickRecurringIncomeFields(req.body),
       userId: req.userId,
     });
 
