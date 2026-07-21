@@ -30,4 +30,26 @@ describe('createIncomeEntryObject', () => {
     expect(result.category).toBe('bankAccounts');
     expect(result.amount).toBe('3500');
   });
+
+  it('passes through currency and the client-generated id (used for optimistic UI)', () => {
+    const result = createIncomeEntryObject(
+      { ...baseBody, id: 'client-uuid-1', currency: 'USD' },
+      'user-1'
+    );
+    expect(result.id).toBe('client-uuid-1');
+    expect(result.currency).toBe('USD');
+  });
+
+  it('drops any unexpected fields instead of mass-assigning them (e.g. a forged createdAt)', () => {
+    const maliciousBody = {
+      ...baseBody,
+      createdAt: '1999-01-01T00:00:00.000Z',
+      isAdmin: true,
+    } as typeof baseBody & { createdAt: string; isAdmin: boolean };
+
+    const result = createIncomeEntryObject(maliciousBody, 'user-1');
+
+    expect(result).not.toHaveProperty('createdAt');
+    expect(result).not.toHaveProperty('isAdmin');
+  });
 });

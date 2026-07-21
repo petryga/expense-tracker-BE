@@ -104,3 +104,46 @@ describe('DELETE /:id', () => {
     expect(destroyOrder).toBeLessThan(findAllOrder);
   });
 });
+
+describe('PUT /:id', () => {
+  const handler = getHandler('put', '/:id');
+
+  beforeEach(() => {
+    vi.spyOn(sequelize, 'transaction').mockImplementation(((fn: any) => fn({} as any)) as any);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('does not mass-assign unexpected fields on update (e.g. a forged userId or createdAt)', async () => {
+    const update = vi.fn().mockImplementation(async (data: any) => ({ ...data, date: '2026-07-15' }));
+    const incomeEntry = { id: 'e1', userId: 'u1', update } as unknown as IncomeEntry;
+
+    vi.spyOn(IncomeEntry, 'findOne').mockResolvedValue(incomeEntry);
+    vi.spyOn(IncomeEntry, 'findAll').mockResolvedValue([]);
+    vi.spyOn(MonthlyData, 'findOne').mockResolvedValue(null);
+    vi.spyOn(MonthlyData, 'create').mockResolvedValue({} as any);
+
+    const req = {
+      params: { id: 'e1' },
+      userId: 'u1',
+      body: {
+        date: '2026-07-15',
+        description: 'Salary',
+        category: 'bankAccounts',
+        amount: '3500',
+        currency: Currency.CAD,
+        userId: 'someone-elses-id',
+        createdAt: '1999-01-01T00:00:00.000Z',
+      },
+    } as unknown as Request;
+    const res = mockRes();
+
+    await handler(req, res);
+
+    const updated = update.mock.calls[0][0] as Record<string, unknown>;
+    expect(updated.userId).toBe('u1');
+    expect(updated).not.toHaveProperty('createdAt');
+  });
+});

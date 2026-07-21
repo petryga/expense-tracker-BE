@@ -14,13 +14,23 @@ interface ExpenseBody {
 }
 
 export const createExpenseObject = (body: ExpenseBody, userId: string | null) => {
-  const { datePosted } = body;
+  // Explicit allow-list rather than `...body` — the FE assigns its own uuid
+  // client-side for optimistic UI (see EditToolBar.tsx), so `id` is a
+  // legitimate field to accept, but nothing else the client sends (e.g. a
+  // forged createdAt/updatedAt) should reach the database.
+  const { id, category, amount, account, description, datePosted, currency } = body;
   const date = parseISO(datePosted);
 
   const year = getYear(date) || null;
   const month = getMonth(date) + 1 || null;
   return {
-    ...body,
+    id,
+    category,
+    amount,
+    account,
+    description,
+    datePosted,
+    currency,
     year,
     month,
     userId,
