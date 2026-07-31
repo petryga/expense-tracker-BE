@@ -5,6 +5,8 @@ import { RecurringExpense } from '../models/RecurringExpense.js';
 import { RecurringIncomeEntry } from '../models/RecurringIncomeEntry.js';
 import { MonthlyData } from '../models/MonthlyData.js';
 import { Account } from '../models/Account.js';
+import { Category } from '../models/Category.js';
+import { CategoryBudget } from '../models/CategoryBudget.js';
 import { createExpenseObject, postMonthlyData as postExpenseMonthlyData } from './expensesUtils.js';
 import { createIncomeEntryObject, postMonthlyData as postIncomeMonthlyData } from './incomeEntriesUtils.js';
 
@@ -80,6 +82,12 @@ export const resetDemoUserData = async (userId: string) => {
       RecurringIncomeEntry.destroy({ where: { userId }, transaction }),
       MonthlyData.destroy({ where: { userId }, transaction }),
       Account.destroy({ where: { userId }, transaction }),
+      // Not reseeded here - wiping these personal (isDefault:false) rows
+      // just drops the user's owned-category count back to 0, so the next
+      // GET /categories call provisions a fresh starter set automatically
+      // (see services/categories.ts).
+      CategoryBudget.destroy({ where: { userId }, transaction }),
+      Category.destroy({ where: { userId }, transaction }),
     ]);
 
     const months = getLastNMonths(6);
