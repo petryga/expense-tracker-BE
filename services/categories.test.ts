@@ -3,6 +3,11 @@ import type { Request, Response } from 'express';
 import router from './categories.js';
 import { Category } from '../models/Category.js';
 import { CategoryBudget } from '../models/CategoryBudget.js';
+import { provisionStarterCategoriesForUser } from '../utils/starterCategories.js';
+
+vi.mock('../utils/starterCategories.js', () => ({
+  provisionStarterCategoriesForUser: vi.fn(),
+}));
 
 const getHandler = (method: 'get' | 'post' | 'put' | 'delete', path: string) => {
   const layer = (router.stack as any[]).find(
@@ -22,6 +27,52 @@ const mockRes = () => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.mocked(provisionStarterCategoriesForUser).mockClear();
+});
+
+describe('GET /', () => {
+  const handler = getHandler('get', '/');
+
+  it("provisions starter categories when the user doesn't own any yet", async () => {
+    vi.spyOn(Category, 'count').mockResolvedValue(0);
+    vi.spyOn(Category, 'findAll').mockResolvedValue([]);
+    vi.spyOn(CategoryBudget, 'findAll').mockResolvedValue([]);
+
+    const req = { userId: 'u1', query: {} } as unknown as Request;
+    const res = mockRes();
+
+    await handler(req, res);
+
+    expect(Category.count).toHaveBeenCalledWith({ where: { userId: 'u1', isDefault: false } });
+    expect(provisionStarterCategoriesForUser).toHaveBeenCalledWith('u1');
+  });
+
+  it('does not provision when the user already owns categories', async () => {
+    vi.spyOn(Category, 'count').mockResolvedValue(3);
+    vi.spyOn(Category, 'findAll').mockResolvedValue([]);
+    vi.spyOn(CategoryBudget, 'findAll').mockResolvedValue([]);
+
+    const req = { userId: 'u1', query: {} } as unknown as Request;
+    const res = mockRes();
+
+    await handler(req, res);
+
+    expect(provisionStarterCategoriesForUser).not.toHaveBeenCalled();
+  });
+
+  it('provisions for the null-user bucket too, so local no-auth dev self-heals', async () => {
+    vi.spyOn(Category, 'count').mockResolvedValue(0);
+    vi.spyOn(Category, 'findAll').mockResolvedValue([]);
+    vi.spyOn(CategoryBudget, 'findAll').mockResolvedValue([]);
+
+    const req = { userId: null, query: {} } as unknown as Request;
+    const res = mockRes();
+
+    await handler(req, res);
+
+    expect(Category.count).toHaveBeenCalledWith({ where: { userId: null, isDefault: false } });
+    expect(provisionStarterCategoriesForUser).toHaveBeenCalledWith(null);
+  });
 });
 
 describe('PUT /:id/budget', () => {
@@ -101,5 +152,42 @@ describe('PUT /:id/budget', () => {
 
     expect(update).toHaveBeenCalledWith({ budget: 700 });
     expect(createSpy).not.toHaveBeenCalled();
+  });
+
+  it('saves an explicit budget of 0 rather than treating it as unset', async () => {
+    vi.spyOn(Category, 'findOne').mockResolvedValue({ id: 'c1', userId: 'u1' } as any);
+    const update = vi.fn().mockResolvedValue({ id: 'b1', categoryId: 'c1', userId: 'u1', budget: 0 });
+    vi.spyOn(CategoryBudget, 'findOne').mockResolvedValue({ id: 'b1', update } as any);
+    const createSpy = vi.spyOn(CategoryBudget, 'create');
+
+    const req = {
+      userId: 'u1',
+      params: { id: 'c1' },
+      body: { budget: 0 },
+    } as unknown as Request;
+    const res = mockRes();
+
+    await handler(req, res);
+
+    expect(update).toHaveBeenCalledWith({ budget: 0 });
+    expect(createSpy).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith({ id: 'b1', categoryId: 'c1', userId: 'u1', budget: 0 });
+  });
+
+  it('clears an existing budget by updating it to null', async () => {
+    vi.spyOn(Category, 'findOne').mockResolvedValue({ id: 'c1', userId: 'u1' } as any);
+    const update = vi.fn().mockResolvedValue({ id: 'b1', categoryId: 'c1', userId: 'u1', budget: null });
+    vi.spyOn(CategoryBudget, 'findOne').mockResolvedValue({ id: 'b1', update } as any);
+
+    const req = {
+      userId: 'u1',
+      params: { id: 'c1' },
+      body: { budget: null },
+    } as unknown as Request;
+    const res = mockRes();
+
+    await handler(req, res);
+
+    expect(update).toHaveBeenCalledWith({ budget: null });
   });
 });
