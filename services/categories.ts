@@ -4,11 +4,19 @@ import { Category } from '../models/Category.js';
 import { CategoryBudget } from '../models/CategoryBudget.js';
 import { sequelize } from '../config/database.js';
 import { handleError } from '../utils/common.js';
+import { provisionStarterCategoriesForUser } from '../utils/starterCategories.js';
 
 const router = Router();
 
 router.get('/', async (req, res) => {
   try {
+    const ownedCategoryCount = await Category.count({
+      where: { userId: req.userId, isDefault: false },
+    });
+    if (ownedCategoryCount === 0) {
+      await provisionStarterCategoriesForUser(req.userId);
+    }
+
     const categories = await Category.findAll({
       where: {
         [Op.or]: [{ isDefault: true }, { userId: req.userId }],

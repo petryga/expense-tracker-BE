@@ -2,53 +2,21 @@
 
 const { randomUUID } = require('crypto');
 
+// Only these stay as the shared, undeletable isDefault:true pool that every
+// user sees. Everything else is provisioned as a personal, deletable copy
+// per user on first sign-in instead (see utils/starterCategories.ts).
 const CATEGORIES = [
   {
     name: 'Bills',
-    subcategories: ['Rent', 'Electricity', 'Internet', 'Mobile Phone'],
-  },
-  {
-    name: 'Fees',
-    subcategories: ['Financial Fees', 'Legal Fees'],
+    subcategories: ['Electricity', 'Internet'],
   },
   {
     name: 'Food & Dining',
-    subcategories: ['Groceries', 'Eating Out', 'Coffee Shops'],
-  },
-  {
-    name: 'Transportation',
-    subcategories: ['Public Transport', 'Taxi & Ride Shares'],
-  },
-  {
-    name: 'Lifestyle',
-    subcategories: ['Subscriptions', 'Travel & Vacation', 'Entertainment', 'Books', 'Pets', 'Education'],
-  },
-  {
-    name: 'Shopping',
-    subcategories: ['Clothing', 'Household Goods', 'Furniture & Housewares', 'Beauty', 'Hobbies'],
-  },
-  {
-    name: 'Health',
-    subcategories: ['Medical Expenses', 'Pharmacy', 'Wellness & Spa'],
-  },
-  {
-    name: 'Gifts',
-    subcategories: ['Gifts'],
-  },
-  {
-    name: 'Rewards',
-    subcategories: ['Credit Card Rewards'],
+    subcategories: ['Groceries'],
   },
 ];
 
-const BUDGETS = {
-  'Travel & Vacation': 50,
-  Entertainment: 50,
-  Clothing: 50,
-  Beauty: 50,
-  'Furniture & Housewares': 100,
-  Subscriptions: 40,
-};
+const BUDGETS = {};
 
 module.exports = {
   up: async (queryInterface) => {
