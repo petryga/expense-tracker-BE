@@ -7,6 +7,8 @@ import { RecurringExpense } from '../models/RecurringExpense.js';
 import { RecurringIncomeEntry } from '../models/RecurringIncomeEntry.js';
 import { MonthlyData } from '../models/MonthlyData.js';
 import { Account } from '../models/Account.js';
+import { Category } from '../models/Category.js';
+import { CategoryBudget } from '../models/CategoryBudget.js';
 
 const USER_ID = 'demo-user-123';
 // resetDemoUserData runs everything inside sequelize.transaction; the
@@ -43,6 +45,9 @@ beforeEach(() => {
 
   vi.spyOn(Account, 'destroy').mockResolvedValue(0);
   vi.spyOn(Account, 'bulkCreate').mockResolvedValue([] as any);
+
+  vi.spyOn(Category, 'destroy').mockResolvedValue(0);
+  vi.spyOn(CategoryBudget, 'destroy').mockResolvedValue(0);
 });
 
 afterEach(() => {
@@ -50,7 +55,7 @@ afterEach(() => {
 });
 
 describe('resetDemoUserData', () => {
-  it('wipes all six tables scoped to the given userId before reseeding', async () => {
+  it('wipes all eight tables scoped to the given userId before reseeding', async () => {
     await resetDemoUserData(USER_ID);
 
     expect(Expense.destroy).toHaveBeenCalledWith({
@@ -77,6 +82,22 @@ describe('resetDemoUserData', () => {
       where: { userId: USER_ID },
       transaction: FAKE_TRANSACTION,
     });
+    expect(CategoryBudget.destroy).toHaveBeenCalledWith({
+      where: { userId: USER_ID },
+      transaction: FAKE_TRANSACTION,
+    });
+    expect(Category.destroy).toHaveBeenCalledWith({
+      where: { userId: USER_ID },
+      transaction: FAKE_TRANSACTION,
+    });
+  });
+
+  it('does not recreate categories itself - relies on GET /categories to reprovision', async () => {
+    const createSpy = vi.spyOn(Category, 'create');
+
+    await resetDemoUserData(USER_ID);
+
+    expect(createSpy).not.toHaveBeenCalled();
   });
 
   it('creates 6 fake expenses and 2 fake income entries per month across 6 months, all owned by userId', async () => {
