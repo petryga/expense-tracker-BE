@@ -5,7 +5,7 @@ export class CategoryBudget extends Model {
   declare id: string;
   declare categoryId: string;
   declare userId: string | null;
-  declare budget: number;
+  declare budget: number | null;
 }
 
 CategoryBudget.init(
@@ -22,7 +22,7 @@ CategoryBudget.init(
     },
     budget: {
       type: DataTypes.FLOAT,
-      allowNull: false,
+      allowNull: true,
     },
     createdAt: {
       type: DataTypes.DATE,
