@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeAll } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 
