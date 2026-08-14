@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    name: Lint, typecheck, migrate, test
+    runs-on: ubuntu-latest
+
+    # A real Postgres container, started and health-checked by the runner before any
+    # step runs. This is what makes it possible to apply migrations for real rather
+    # than mocking them - the whole point of this workflow.
+    services:
+      postgres:
+        image: postgres:17 # same major as Supabase production (17.6) and local dev
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: expense_tracker_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d expense_tracker_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Required, not optional: config/database.ts calls process.exit(1) when any of
+      # DB_DATABASE / DB_USERNAME / DB_PASSWORD is missing, and every model imports it.
+      # Without these the job would die before a single test ran.
+      DB_HOST: localhost # also keeps isLocalDb true, so SSL stays off (see config/database.ts)
+      DB_PORT: 5432
+      DB_USERNAME: ci
+      DB_PASSWORD: ci
+      DB_DATABASE: expense_tracker_ci
+
+      # SUPABASE_* is deliberately unset, so requireAuth runs in its no-auth mode and
+      # every request gets userId: null - matching how local dev behaves.
+
+      HUSKY: 0 # don't install git hooks in CI; `npm ci` would otherwise run `prepare`
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20 # matches local (v20.18.1)
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint # --max-warnings 0: any warning fails the build
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # The guard this workflow exists for. `npm start` runs migrations on every deploy
+      # with no staging step, so a migration that throws stops the service from booting.
+      # Applying all of them to an empty database here catches that first.
+      - name: Run migrations against an empty database
+        run: npm run migrate
+
+      # Seeders only ever run against a from-scratch database, which means nothing
+      # exercises them in normal use. An empty bulkInsert bug survived here undetected
+      # until it was found by hand on 2026-08-13.
+      - name: Run seeders
+        run: npm run seed
+
+      - name: Tests
+        run: npm test
