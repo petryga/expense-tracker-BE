@@ -63,7 +63,14 @@ module.exports = {
     }
 
     await queryInterface.bulkInsert('categories', [...categoryRows, ...subcategoryRows]);
-    await queryInterface.bulkInsert('category_budgets', budgetRows);
+
+    // BUDGETS is currently empty, so budgetRows can be []. bulkInsert with an empty array
+    // emits `INSERT INTO category_budgets () VALUES ()`, which is a syntax error - and it
+    // throws *after* the categories above are already inserted, leaving the seeder
+    // half-applied and unrecorded, so a retry would duplicate them.
+    if (budgetRows.length > 0) {
+      await queryInterface.bulkInsert('category_budgets', budgetRows);
+    }
   },
 
   down: async (queryInterface) => {
