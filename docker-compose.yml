@@ -1,0 +1,55 @@
+# Disposable Postgres for local development.
+#
+# This is NOT where your real local data lives. Your working database is the Homebrew
+# Postgres on port 5432; this container deliberately uses 5433 so the two can never be
+# confused. Everything in here can be destroyed and rebuilt at will:
+#
+#   docker compose up -d           start it
+#   docker compose down            stop it, keep the data
+#   docker compose down -v         stop it and delete the data (back to empty)
+#
+# Credentials come from BE/.env (gitignored), so no secrets live in this file.
+
+# Without this, Compose names the project after the directory ("be"), which is generic
+# enough to collide with any other project that has a BE/ folder. Volumes and networks
+# are prefixed with it, so being explicit keeps this app's resources identifiable.
+name: expenses-tracker
+
+services:
+  db:
+    image: postgres:17
+    container_name: expenses-tracker-db
+
+    environment:
+      # The postgres image creates this user/database on first startup, using the same
+      # values the app already expects. Reusing BE/.env means there's one source of truth.
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE}
+
+    ports:
+      # "host:container" - reachable at 127.0.0.1:5433 on the Mac, while Postgres inside
+      # the container still listens on its normal 5432.
+      #
+      # 5433 is deliberate: Homebrew Postgres owns 5432 and holds the real data. Binding
+      # to 127.0.0.1 (rather than 0.0.0.0) also keeps the database off the local network.
+      - "127.0.0.1:5433:5432"
+
+    volumes:
+      # A named volume managed by Docker. Without it, the database would be wiped every
+      # time the container is recreated - with it, data survives `down` and is removed
+      # only by `down -v`.
+      - db-data:/var/lib/postgresql/data
+
+    healthcheck:
+      # "Running" and "ready for queries" are different things: Postgres accepts
+      # connections a second or two after the container starts. This is what lets other
+      # services wait properly (needed once the API is containerised in Phase 3).
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_DATABASE}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  db-data:
