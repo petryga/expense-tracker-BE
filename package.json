@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc",
     "start": "npm run migrate && node dist/index.js",
-    "dev": "nodemon -e ts -x 'node --import ./scripts/register-ts-node-esm.mjs index.ts'",
+    "dev": "nodemon -e ts -x \"tsx index.ts\"",
     "migrate": "sequelize-cli db:migrate --options-path .sequelizerc.cjs",
     "migrate:undo": "sequelize-cli db:migrate:undo --options-path .sequelizerc.cjs",
     "seed": "sequelize-cli db:seed:all --options-path .sequelizerc.cjs",
@@ -40,13 +40,14 @@
     "@types/node": "^24.13.3",
     "@types/sequelize": "^4.28.20",
     "@types/supertest": "^7.2.1",
+    "@typescript/native": "npm:typescript@^7.0.2",
     "eslint": "^10.8.1",
     "globals": "^17.11.0",
     "husky": "^9.1.7",
     "nodemon": "^3.1.14",
     "supertest": "^7.2.2",
-    "ts-node": "^10.9.2",
-    "typescript": "^6.0.3",
+    "tsx": "^4.23.12",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
     "typescript-eslint": "^8.67.0",
     "vitest": "^4.1.10"
   }
