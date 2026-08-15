@@ -47,7 +47,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20 # matches local (v20.18.1)
+          node-version: 24 # matches local (v24.19.0)
           cache: npm
 
       - name: Install dependencies
