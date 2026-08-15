@@ -60,6 +60,16 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 });
 app.use(express.json());
 
+// Express 5 leaves req.body as undefined when there was nothing to parse (no
+// body, or no JSON content-type); Express 4 left an empty object. Handlers here
+// destructure req.body directly, so without this a bodyless POST throws a
+// TypeError that only happens to surface as a 400 because of a surrounding
+// try/catch. Restoring the v4 shape keeps that validation explicit.
+app.use((req, _res, next) => {
+  if (req.body === undefined) req.body = {};
+  next();
+});
+
 // Unauthenticated on purpose — hosting platforms ping this to check the
 // container is up, before any user has a token to send.
 app.get('/health', (req, res) => res.status(200).json({ status: 'ok' }));
