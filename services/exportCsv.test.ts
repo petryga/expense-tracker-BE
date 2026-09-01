@@ -19,7 +19,7 @@ vi.mock('fs/promises', () => ({
 
 const getHandler = () => {
   const layer = (router.stack as any[]).find(
-    (candidate) => candidate.route?.path === '/' && candidate.route?.methods?.get
+    (candidate) => candidate.route?.path === '/' && candidate.route?.methods?.get,
   );
   if (!layer) throw new Error('No GET / route registered');
   return layer.route.stack[0].handle as (req: Request, res: Response) => Promise<void>;
@@ -84,7 +84,7 @@ describe('GET /export', () => {
     const req = { userId: 'u1' } as unknown as Request;
     const res = mockRes();
     (res.download as any).mockImplementation((_path: string, _name: string, cb: () => void) =>
-      cb()
+      cb(),
     );
 
     await handler(req, res);
@@ -99,8 +99,8 @@ describe('GET /export', () => {
     const req = { userId: 'u1' } as unknown as Request;
     const res = mockRes();
     const transferError = new Error('client aborted');
-    (res.download as any).mockImplementation((_path: string, _name: string, cb: (e: Error) => void) =>
-      cb(transferError)
+    (res.download as any).mockImplementation(
+      (_path: string, _name: string, cb: (e: Error) => void) => cb(transferError),
     );
 
     await handler(req, res);

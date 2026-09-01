@@ -41,7 +41,10 @@ module.exports = {
   up: async (queryInterface, Sequelize) => {
     const rows = await queryInterface.sequelize.query(
       'SELECT id FROM categories WHERE user_id IS NULL AND is_default = true AND name IN (:names)',
-      { replacements: { names: REMOVED_CATEGORY_NAMES }, type: queryInterface.sequelize.QueryTypes.SELECT }
+      {
+        replacements: { names: REMOVED_CATEGORY_NAMES },
+        type: queryInterface.sequelize.QueryTypes.SELECT,
+      },
     );
     const categoryIds = rows.map((row) => row.id);
     if (categoryIds.length === 0) return;

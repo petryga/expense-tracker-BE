@@ -24,8 +24,7 @@ beforeEach(() => {
   // data's content, which is already covered in demoData.test.ts.
   vi.spyOn(Math, 'random').mockReturnValue(0);
 
-  vi.spyOn(sequelize, 'transaction').mockImplementation(((fn: any) =>
-    fn(FAKE_TRANSACTION)) as any);
+  vi.spyOn(sequelize, 'transaction').mockImplementation(((fn: any) => fn(FAKE_TRANSACTION)) as any);
 
   vi.spyOn(Expense, 'destroy').mockResolvedValue(0);
   vi.spyOn(Expense, 'create').mockImplementation((data: any) => Promise.resolve(data));
@@ -136,7 +135,7 @@ describe('resetDemoUserData', () => {
     expect(accounts.every((row) => row.userId === USER_ID)).toBe(true);
     expect(accounts.every((row) => row.isDefault === false)).toBe(true);
     expect(accounts.map((row) => row.name).sort()).toEqual(
-      ['Acme Checking', 'Acme Credit Card', 'Globex Savings'].sort()
+      ['Acme Checking', 'Acme Credit Card', 'Globex Savings'].sort(),
     );
   });
 });

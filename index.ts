@@ -9,7 +9,7 @@ if (
 ) {
   console.error(
     'Refusing to start in production without SUPABASE_URL. ' +
-      'Set SUPABASE_URL, or set AUTH_DISABLED=true to run without auth on purpose.'
+      'Set SUPABASE_URL, or set AUTH_DISABLED=true to run without auth on purpose.',
   );
   process.exit(1);
 }

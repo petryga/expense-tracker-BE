@@ -34,7 +34,7 @@ describe('createIncomeEntryObject', () => {
   it('passes through currency and the client-generated id (used for optimistic UI)', () => {
     const result = createIncomeEntryObject(
       { ...baseBody, id: 'client-uuid-1', currency: 'USD' },
-      'user-1'
+      'user-1',
     );
     expect(result.id).toBe('client-uuid-1');
     expect(result.currency).toBe('USD');

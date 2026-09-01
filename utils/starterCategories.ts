@@ -57,35 +57,38 @@ const STARTER_TOP_LEVEL_CATEGORIES: {
 // Subcategories that hang off the categories which remain shared defaults -
 // their parent already exists (isDefault:true, userId:null), so only the
 // subcategory itself needs a personal copy.
-const STARTER_SUBCATEGORIES_FOR_SHARED_PARENTS: { parentName: string; subcategories: string[] }[] = [
-  { parentName: 'Bills', subcategories: ['Rent', 'Mobile Phone'] },
-  { parentName: 'Food & Dining', subcategories: ['Eating Out', 'Coffee Shops'] },
-];
+const STARTER_SUBCATEGORIES_FOR_SHARED_PARENTS: { parentName: string; subcategories: string[] }[] =
+  [
+    { parentName: 'Bills', subcategories: ['Rent', 'Mobile Phone'] },
+    { parentName: 'Food & Dining', subcategories: ['Eating Out', 'Coffee Shops'] },
+  ];
 
 export const provisionStarterCategoriesForUser = async (userId: string | null) => {
   const sharedParentNames = STARTER_SUBCATEGORIES_FOR_SHARED_PARENTS.map((p) => p.parentName);
   const sharedParents = await Category.findAll({
     where: { isDefault: true, userId: null, parentCategoryId: null, name: sharedParentNames },
   });
-  const sharedParentIdByName = new Map(sharedParents.map((category) => [category.name, category.id]));
+  const sharedParentIdByName = new Map(
+    sharedParents.map((category) => [category.name, category.id]),
+  );
 
   await sequelize.transaction(async (transaction) => {
     for (const { name, subcategories } of STARTER_TOP_LEVEL_CATEGORIES) {
       const parent = await Category.create(
         { name, parentCategoryId: null, isDefault: false, userId },
-        { transaction }
+        { transaction },
       );
 
       for (const subcategory of subcategories) {
         const created = await Category.create(
           { name: subcategory.name, parentCategoryId: parent.id, isDefault: false, userId },
-          { transaction }
+          { transaction },
         );
 
         if (subcategory.budget !== undefined) {
           await CategoryBudget.create(
             { categoryId: created.id, userId, budget: subcategory.budget },
-            { transaction }
+            { transaction },
           );
         }
       }
@@ -98,7 +101,7 @@ export const provisionStarterCategoriesForUser = async (userId: string | null) =
       for (const name of subcategories) {
         await Category.create(
           { name, parentCategoryId: parentId, isDefault: false, userId },
-          { transaction }
+          { transaction },
         );
       }
     }

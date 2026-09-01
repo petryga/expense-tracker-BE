@@ -33,7 +33,7 @@ services:
       #
       # 5433 is deliberate: Homebrew Postgres owns 5432 and holds the real data. Binding
       # to 127.0.0.1 (rather than 0.0.0.0) also keeps the database off the local network.
-      - "127.0.0.1:5433:5432"
+      - '127.0.0.1:5433:5432'
 
     volumes:
       # A named volume managed by Docker. Without it, the database would be wiped every
@@ -45,7 +45,7 @@ services:
       # "Running" and "ready for queries" are different things: Postgres accepts
       # connections a second or two after the container starts. This is what lets other
       # services wait properly (needed once the API is containerised in Phase 3).
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_DATABASE}"]
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USERNAME} -d ${DB_DATABASE}']
       interval: 5s
       timeout: 5s
       retries: 10

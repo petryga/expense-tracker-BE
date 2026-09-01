@@ -58,5 +58,5 @@ RecurringIncomeEntry.init(
     tableName: 'recurring_income_entries',
     underscored: true,
     sequelize,
-  }
+  },
 );

@@ -63,5 +63,5 @@ IncomeEntry.init(
     tableName: 'income_entries',
     underscored: true,
     sequelize,
-  }
+  },
 );

@@ -78,5 +78,5 @@ Expense.init(
     tableName: 'expenses',
     underscored: true,
     sequelize,
-  }
+  },
 );

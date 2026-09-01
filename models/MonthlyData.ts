@@ -60,5 +60,5 @@ MonthlyData.init(
     tableName: 'monthly_data',
     underscored: true,
     sequelize,
-  }
+  },
 );

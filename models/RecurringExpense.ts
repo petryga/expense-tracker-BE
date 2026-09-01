@@ -69,5 +69,5 @@ RecurringExpense.init(
     tableName: 'recurring_expenses',
     underscored: true,
     sequelize,
-  }
+  },
 );

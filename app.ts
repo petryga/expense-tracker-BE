@@ -49,7 +49,7 @@ app.use(
       }
       callback(new Error('Not allowed by CORS'));
     },
-  })
+  }),
 );
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   if (err.message === 'Not allowed by CORS') {

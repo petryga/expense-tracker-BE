@@ -40,7 +40,7 @@ jobs:
       # SUPABASE_* is deliberately unset. AUTH_DISABLED opts into the no-auth mode
       # explicitly (without it, requireAuth fails closed with a 500) so every
       # request gets userId: null - matching how local dev behaves.
-      AUTH_DISABLED: "true"
+      AUTH_DISABLED: 'true'
 
       HUSKY: 0 # don't install git hooks in CI; `npm ci` would otherwise run `prepare`
 

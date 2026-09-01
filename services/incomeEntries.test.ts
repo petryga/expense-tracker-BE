@@ -10,7 +10,7 @@ import { sequelize } from '../config/database.js';
 // directly without spinning up an HTTP server.
 const getHandler = (method: 'get' | 'post' | 'put' | 'delete', path: string) => {
   const layer = (router.stack as any[]).find(
-    (candidate) => candidate.route?.path === path && candidate.route?.methods?.[method]
+    (candidate) => candidate.route?.path === path && candidate.route?.methods?.[method],
   );
   if (!layer) throw new Error(`No ${method.toUpperCase()} ${path} route registered`);
   return layer.route.stack[0].handle as (req: Request, res: Response) => Promise<void>;
@@ -53,9 +53,7 @@ describe('DELETE /:id', () => {
     } as unknown as IncomeEntry;
 
     vi.spyOn(IncomeEntry, 'findOne').mockResolvedValue(incomeEntry);
-    vi.spyOn(IncomeEntry, 'findAll').mockImplementation(async () =>
-      deleted ? [] : [incomeEntry]
-    );
+    vi.spyOn(IncomeEntry, 'findAll').mockImplementation(async () => (deleted ? [] : [incomeEntry]));
 
     const monthlyDataDestroy = vi.fn().mockResolvedValue(undefined);
     const monthlyDataUpdate = vi.fn().mockResolvedValue(undefined);
@@ -117,7 +115,9 @@ describe('PUT /:id', () => {
   });
 
   it('does not mass-assign unexpected fields on update (e.g. a forged userId or createdAt)', async () => {
-    const update = vi.fn().mockImplementation(async (data: any) => ({ ...data, date: '2026-07-15' }));
+    const update = vi
+      .fn()
+      .mockImplementation(async (data: any) => ({ ...data, date: '2026-07-15' }));
     const incomeEntry = { id: 'e1', userId: 'u1', update } as unknown as IncomeEntry;
 
     vi.spyOn(IncomeEntry, 'findOne').mockResolvedValue(incomeEntry);

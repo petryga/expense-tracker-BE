@@ -18,12 +18,13 @@ const SHARED_PARENTS = [
 
 beforeEach(() => {
   vi.spyOn(Category, 'findAll').mockResolvedValue(SHARED_PARENTS as any);
-  vi.spyOn(sequelize, 'transaction').mockImplementation(((fn: any) =>
-    fn(FAKE_TRANSACTION)) as any);
+  vi.spyOn(sequelize, 'transaction').mockImplementation(((fn: any) => fn(FAKE_TRANSACTION)) as any);
   vi.spyOn(Category, 'create').mockImplementation(
-    (data: any) => Promise.resolve({ id: `${data.name}-id`, ...data }) as any
+    (data: any) => Promise.resolve({ id: `${data.name}-id`, ...data }) as any,
   );
-  vi.spyOn(CategoryBudget, 'create').mockImplementation((data: any) => Promise.resolve(data) as any);
+  vi.spyOn(CategoryBudget, 'create').mockImplementation(
+    (data: any) => Promise.resolve(data) as any,
+  );
 });
 
 afterEach(() => {
@@ -59,7 +60,7 @@ describe('provisionStarterCategoriesForUser', () => {
     for (const name of topLevelNames) {
       expect(Category.create).toHaveBeenCalledWith(
         { name, parentCategoryId: null, isDefault: false, userId: USER_ID },
-        { transaction: FAKE_TRANSACTION }
+        { transaction: FAKE_TRANSACTION },
       );
     }
   });
@@ -69,7 +70,7 @@ describe('provisionStarterCategoriesForUser', () => {
 
     expect(Category.create).toHaveBeenCalledWith(
       { name: 'Financial Fees', parentCategoryId: 'Fees-id', isDefault: false, userId: USER_ID },
-      { transaction: FAKE_TRANSACTION }
+      { transaction: FAKE_TRANSACTION },
     );
   });
 
@@ -78,11 +79,11 @@ describe('provisionStarterCategoriesForUser', () => {
 
     expect(CategoryBudget.create).toHaveBeenCalledWith(
       { categoryId: 'Subscriptions-id', userId: USER_ID, budget: 40 },
-      { transaction: FAKE_TRANSACTION }
+      { transaction: FAKE_TRANSACTION },
     );
     expect(CategoryBudget.create).not.toHaveBeenCalledWith(
       expect.objectContaining({ categoryId: 'Books-id' }),
-      expect.anything()
+      expect.anything(),
     );
   });
 
@@ -91,11 +92,11 @@ describe('provisionStarterCategoriesForUser', () => {
 
     expect(Category.create).toHaveBeenCalledWith(
       { name: 'Rent', parentCategoryId: 'bills-id', isDefault: false, userId: USER_ID },
-      { transaction: FAKE_TRANSACTION }
+      { transaction: FAKE_TRANSACTION },
     );
     expect(Category.create).toHaveBeenCalledWith(
       { name: 'Mobile Phone', parentCategoryId: 'bills-id', isDefault: false, userId: USER_ID },
-      { transaction: FAKE_TRANSACTION }
+      { transaction: FAKE_TRANSACTION },
     );
   });
 
@@ -104,11 +105,11 @@ describe('provisionStarterCategoriesForUser', () => {
 
     expect(Category.create).toHaveBeenCalledWith(
       { name: 'Eating Out', parentCategoryId: 'food-id', isDefault: false, userId: USER_ID },
-      { transaction: FAKE_TRANSACTION }
+      { transaction: FAKE_TRANSACTION },
     );
     expect(Category.create).toHaveBeenCalledWith(
       { name: 'Coffee Shops', parentCategoryId: 'food-id', isDefault: false, userId: USER_ID },
-      { transaction: FAKE_TRANSACTION }
+      { transaction: FAKE_TRANSACTION },
     );
   });
 
@@ -118,7 +119,7 @@ describe('provisionStarterCategoriesForUser', () => {
     await expect(provisionStarterCategoriesForUser(USER_ID)).resolves.not.toThrow();
     expect(Category.create).not.toHaveBeenCalledWith(
       expect.objectContaining({ name: 'Eating Out' }),
-      expect.anything()
+      expect.anything(),
     );
   });
 
@@ -127,7 +128,7 @@ describe('provisionStarterCategoriesForUser', () => {
 
     expect(Category.create).toHaveBeenCalledWith(
       { name: 'Fees', parentCategoryId: null, isDefault: false, userId: null },
-      { transaction: FAKE_TRANSACTION }
+      { transaction: FAKE_TRANSACTION },
     );
   });
 });

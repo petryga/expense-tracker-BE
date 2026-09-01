@@ -18,7 +18,9 @@ describe('CORS fallback when FRONTEND_URL is not set (local dev)', () => {
   });
 
   it('does not fall back to allowing everything else', async () => {
-    const res = await request(app).get('/health').set('Origin', 'https://not-my-frontend.example.com');
+    const res = await request(app)
+      .get('/health')
+      .set('Origin', 'https://not-my-frontend.example.com');
     expect(res.status).toBe(403);
   });
 });

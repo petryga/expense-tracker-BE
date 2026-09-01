@@ -48,7 +48,7 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
       return;
     }
     console.error(
-      'SUPABASE_URL is not set and AUTH_DISABLED is not "true" — refusing to serve unauthenticated requests.'
+      'SUPABASE_URL is not set and AUTH_DISABLED is not "true" — refusing to serve unauthenticated requests.',
     );
     res.status(500).json({ error: 'Server auth is not configured' });
     return;

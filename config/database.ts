@@ -29,5 +29,5 @@ export const sequelize = new Sequelize(
     dialect: 'postgres',
     logging: false,
     dialectOptions: isLocalDb ? {} : { ssl: { require: true, rejectUnauthorized } },
-  }
+  },
 );

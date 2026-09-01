@@ -11,7 +11,7 @@ vi.mock('../utils/starterCategories.js', () => ({
 
 const getHandler = (method: 'get' | 'post' | 'put' | 'delete', path: string) => {
   const layer = (router.stack as any[]).find(
-    (candidate) => candidate.route?.path === path && candidate.route?.methods?.[method]
+    (candidate) => candidate.route?.path === path && candidate.route?.methods?.[method],
   );
   if (!layer) throw new Error(`No ${method.toUpperCase()} ${path} route registered`);
   return layer.route.stack[0].handle as (req: Request, res: Response) => Promise<void>;
@@ -117,7 +117,11 @@ describe('PUT /:id/budget', () => {
   });
 
   it('creates a budget when the category is a shared default category', async () => {
-    vi.spyOn(Category, 'findOne').mockResolvedValue({ id: 'c1', isDefault: true, userId: null } as any);
+    vi.spyOn(Category, 'findOne').mockResolvedValue({
+      id: 'c1',
+      isDefault: true,
+      userId: null,
+    } as any);
     vi.spyOn(CategoryBudget, 'findOne').mockResolvedValue(null);
     const createSpy = vi
       .spyOn(CategoryBudget, 'create')
@@ -137,7 +141,9 @@ describe('PUT /:id/budget', () => {
 
   it('updates an existing budget rather than creating a duplicate', async () => {
     vi.spyOn(Category, 'findOne').mockResolvedValue({ id: 'c1', userId: 'u1' } as any);
-    const update = vi.fn().mockResolvedValue({ id: 'b1', categoryId: 'c1', userId: 'u1', budget: 700 });
+    const update = vi
+      .fn()
+      .mockResolvedValue({ id: 'b1', categoryId: 'c1', userId: 'u1', budget: 700 });
     vi.spyOn(CategoryBudget, 'findOne').mockResolvedValue({ id: 'b1', update } as any);
     const createSpy = vi.spyOn(CategoryBudget, 'create');
 
@@ -156,7 +162,9 @@ describe('PUT /:id/budget', () => {
 
   it('saves an explicit budget of 0 rather than treating it as unset', async () => {
     vi.spyOn(Category, 'findOne').mockResolvedValue({ id: 'c1', userId: 'u1' } as any);
-    const update = vi.fn().mockResolvedValue({ id: 'b1', categoryId: 'c1', userId: 'u1', budget: 0 });
+    const update = vi
+      .fn()
+      .mockResolvedValue({ id: 'b1', categoryId: 'c1', userId: 'u1', budget: 0 });
     vi.spyOn(CategoryBudget, 'findOne').mockResolvedValue({ id: 'b1', update } as any);
     const createSpy = vi.spyOn(CategoryBudget, 'create');
 
@@ -176,7 +184,9 @@ describe('PUT /:id/budget', () => {
 
   it('clears an existing budget by updating it to null', async () => {
     vi.spyOn(Category, 'findOne').mockResolvedValue({ id: 'c1', userId: 'u1' } as any);
-    const update = vi.fn().mockResolvedValue({ id: 'b1', categoryId: 'c1', userId: 'u1', budget: null });
+    const update = vi
+      .fn()
+      .mockResolvedValue({ id: 'b1', categoryId: 'c1', userId: 'u1', budget: null });
     vi.spyOn(CategoryBudget, 'findOne').mockResolvedValue({ id: 'b1', update } as any);
 
     const req = {

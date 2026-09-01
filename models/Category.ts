@@ -47,5 +47,5 @@ Category.init(
     tableName: 'categories',
     underscored: true,
     sequelize,
-  }
+  },
 );

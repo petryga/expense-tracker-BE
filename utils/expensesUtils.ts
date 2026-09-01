@@ -70,7 +70,7 @@ export const postMonthlyData = async ({
       yearMonth,
       userId,
     },
-    { transaction }
+    { transaction },
   );
 };
 
@@ -113,7 +113,7 @@ export const putMonthlyData = async ({
         amountCad: totalAmountCad,
         amountUsd: totalAmountUsd,
       },
-      { transaction }
+      { transaction },
     );
     return;
   }
@@ -126,6 +126,6 @@ export const putMonthlyData = async ({
       yearMonth,
       userId,
     },
-    { transaction }
+    { transaction },
   );
 };

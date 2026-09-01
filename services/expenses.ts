@@ -5,7 +5,6 @@ import { Op } from 'sequelize';
 import { sequelize } from '../config/database.js';
 import { handleError } from '../utils/common.js';
 
-
 const router = Router();
 
 router.get('/', async (req, res) => {

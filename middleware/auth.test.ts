@@ -10,7 +10,10 @@ vi.mock('jose', () => ({
 const makeRes = () => {
   const json = vi.fn();
   const status = vi.fn(() => ({ json }));
-  return { status, json } as unknown as { status: ReturnType<typeof vi.fn>; json: ReturnType<typeof vi.fn> };
+  return { status, json } as unknown as {
+    status: ReturnType<typeof vi.fn>;
+    json: ReturnType<typeof vi.fn>;
+  };
 };
 
 const ENV_KEYS = [

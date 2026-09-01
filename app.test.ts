@@ -9,7 +9,7 @@ process.env.FRONTEND_URL = 'https://myapp.vercel.app';
 const { app, createApiLimiter } = await import('./app.js');
 
 describe('trust proxy', () => {
-  it('trusts the first hop, so req.ip reflects X-Forwarded-For from Northflank\'s proxy', () => {
+  it("trusts the first hop, so req.ip reflects X-Forwarded-For from Northflank's proxy", () => {
     expect(app.get('trust proxy')).toBe(1);
   });
 

@@ -47,5 +47,5 @@ Account.init(
     tableName: 'accounts',
     underscored: true,
     sequelize,
-  }
+  },
 );

@@ -5,7 +5,7 @@ import { RecurringExpense } from '../models/RecurringExpense.js';
 
 const getHandler = (method: 'get' | 'post' | 'put' | 'delete', path: string) => {
   const layer = (router.stack as any[]).find(
-    (candidate) => candidate.route?.path === path && candidate.route?.methods?.[method]
+    (candidate) => candidate.route?.path === path && candidate.route?.methods?.[method],
   );
   if (!layer) throw new Error(`No ${method.toUpperCase()} ${path} route registered`);
   return layer.route.stack[0].handle as (req: Request, res: Response) => Promise<void>;

@@ -41,5 +41,5 @@ CategoryBudget.init(
     tableName: 'category_budgets',
     underscored: true,
     sequelize,
-  }
+  },
 );

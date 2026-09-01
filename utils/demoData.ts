@@ -8,7 +8,10 @@ import { Account } from '../models/Account.js';
 import { Category } from '../models/Category.js';
 import { CategoryBudget } from '../models/CategoryBudget.js';
 import { createExpenseObject, postMonthlyData as postExpenseMonthlyData } from './expensesUtils.js';
-import { createIncomeEntryObject, postMonthlyData as postIncomeMonthlyData } from './incomeEntriesUtils.js';
+import {
+  createIncomeEntryObject,
+  postMonthlyData as postIncomeMonthlyData,
+} from './incomeEntriesUtils.js';
 
 // Fictional accounts, not the real account names anyone using this app
 // actually has - "Cash" alone comes from the global default account seed,
@@ -44,9 +47,30 @@ const INCOME_TEMPLATES: { category: string; description: string; min: number; ma
 ];
 
 const RECURRING_EXPENSE_TEMPLATES = [
-  { account: 'Acme Credit Card', description: 'Streaming Subscription', category: 'Subscriptions', currency: 'USD', amount: 15.99, dayOfMonth: 12 },
-  { account: 'Acme Checking', description: 'Gym Membership', category: 'Entertainment', currency: 'CAD', amount: 45, dayOfMonth: 1 },
-  { account: 'Acme Checking', description: 'Account Fee', category: 'Financial Fees', currency: 'CAD', amount: 4.95, dayOfMonth: 28 },
+  {
+    account: 'Acme Credit Card',
+    description: 'Streaming Subscription',
+    category: 'Subscriptions',
+    currency: 'USD',
+    amount: 15.99,
+    dayOfMonth: 12,
+  },
+  {
+    account: 'Acme Checking',
+    description: 'Gym Membership',
+    category: 'Entertainment',
+    currency: 'CAD',
+    amount: 45,
+    dayOfMonth: 1,
+  },
+  {
+    account: 'Acme Checking',
+    description: 'Account Fee',
+    category: 'Financial Fees',
+    currency: 'CAD',
+    amount: 4.95,
+    dayOfMonth: 28,
+  },
 ];
 
 const RECURRING_INCOME_TEMPLATES = [
@@ -54,8 +78,9 @@ const RECURRING_INCOME_TEMPLATES = [
   { category: 'investments', description: 'Index Fund', currency: 'USD', amount: 0 },
 ];
 
-export const randomBetween = (min: number, max: number) => Math.round((Math.random() * (max - min) + min) * 100) / 100;
-export const randomItem = <T,>(items: T[]): T => items[Math.floor(Math.random() * items.length)];
+export const randomBetween = (min: number, max: number) =>
+  Math.round((Math.random() * (max - min) + min) * 100) / 100;
+export const randomItem = <T>(items: T[]): T => items[Math.floor(Math.random() * items.length)];
 export const randomDay = () => Math.floor(Math.random() * 27) + 1;
 
 export const getLastNMonths = (n: number): { year: number; month: number }[] => {
@@ -106,7 +131,7 @@ export const resetDemoUserData = async (userId: string) => {
             id: '',
             currency: Math.random() > 0.3 ? Currency.CAD : Currency.USD,
           },
-          userId
+          userId,
         );
 
         const expense = await Expense.create(expenseObject, { transaction });
@@ -121,7 +146,7 @@ export const resetDemoUserData = async (userId: string) => {
             category: template.category,
             amount: String(randomBetween(template.min, template.max)),
           },
-          userId
+          userId,
         );
 
         const incomeEntry = await IncomeEntry.create(
@@ -129,7 +154,7 @@ export const resetDemoUserData = async (userId: string) => {
             ...incomeObject,
             currency: 'CAD',
           },
-          { transaction }
+          { transaction },
         );
         await postIncomeMonthlyData({ incomeEntry, transaction });
       }
@@ -137,12 +162,12 @@ export const resetDemoUserData = async (userId: string) => {
 
     await RecurringExpense.bulkCreate(
       RECURRING_EXPENSE_TEMPLATES.map((template) => ({ ...template, userId })),
-      { transaction }
+      { transaction },
     );
 
     await RecurringIncomeEntry.bulkCreate(
       RECURRING_INCOME_TEMPLATES.map((template) => ({ ...template, userId })),
-      { transaction }
+      { transaction },
     );
 
     await Account.bulkCreate(
@@ -152,7 +177,7 @@ export const resetDemoUserData = async (userId: string) => {
         isDefault: false,
         userId,
       })),
-      { transaction }
+      { transaction },
     );
   });
 };

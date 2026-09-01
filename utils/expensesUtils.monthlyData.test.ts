@@ -12,7 +12,13 @@ describe('postMonthlyData', () => {
     vi.spyOn(MonthlyData, 'findOne').mockResolvedValue(null as any);
     const createSpy = vi.spyOn(MonthlyData, 'create').mockResolvedValue({} as any);
 
-    const expense = { amount: '100.50', year: 2026, month: 7, currency: Currency.CAD, userId: 'u1' } as Expense;
+    const expense = {
+      amount: '100.50',
+      year: 2026,
+      month: 7,
+      currency: Currency.CAD,
+      userId: 'u1',
+    } as Expense;
     await postMonthlyData({ expense });
 
     expect(createSpy).toHaveBeenCalledWith(
@@ -23,7 +29,7 @@ describe('postMonthlyData', () => {
         yearMonth: '2026-7',
         userId: 'u1',
       },
-      { transaction: undefined }
+      { transaction: undefined },
     );
   });
 
@@ -31,7 +37,13 @@ describe('postMonthlyData', () => {
     vi.spyOn(MonthlyData, 'findOne').mockResolvedValue(null as any);
     const createSpy = vi.spyOn(MonthlyData, 'create').mockResolvedValue({} as any);
 
-    const expense = { amount: '50', year: 2026, month: 7, currency: Currency.USD, userId: 'u1' } as Expense;
+    const expense = {
+      amount: '50',
+      year: 2026,
+      month: 7,
+      currency: Currency.USD,
+      userId: 'u1',
+    } as Expense;
     await postMonthlyData({ expense });
 
     expect(createSpy).toHaveBeenCalledWith(
@@ -42,7 +54,7 @@ describe('postMonthlyData', () => {
         yearMonth: '2026-7',
         userId: 'u1',
       },
-      { transaction: undefined }
+      { transaction: undefined },
     );
   });
 
@@ -51,7 +63,13 @@ describe('postMonthlyData', () => {
     vi.spyOn(MonthlyData, 'findOne').mockResolvedValue({ increment } as any);
     const createSpy = vi.spyOn(MonthlyData, 'create').mockResolvedValue({} as any);
 
-    const expense = { amount: '25', year: 2026, month: 7, currency: Currency.CAD, userId: 'u1' } as Expense;
+    const expense = {
+      amount: '25',
+      year: 2026,
+      month: 7,
+      currency: Currency.CAD,
+      userId: 'u1',
+    } as Expense;
     await postMonthlyData({ expense });
 
     expect(increment).toHaveBeenCalledWith('amountCad', { by: 25 });
@@ -62,7 +80,13 @@ describe('postMonthlyData', () => {
     const increment = vi.fn().mockResolvedValue(undefined);
     vi.spyOn(MonthlyData, 'findOne').mockResolvedValue({ increment } as any);
 
-    const expense = { amount: '25', year: 2026, month: 7, currency: Currency.USD, userId: 'u1' } as Expense;
+    const expense = {
+      amount: '25',
+      year: 2026,
+      month: 7,
+      currency: Currency.USD,
+      userId: 'u1',
+    } as Expense;
     await postMonthlyData({ expense });
 
     expect(increment).toHaveBeenCalledWith('amountUsd', { by: 25 });
@@ -98,7 +122,7 @@ describe('putMonthlyData', () => {
 
     expect(update).toHaveBeenCalledWith(
       { amountCad: 150, amountUsd: 20 },
-      { transaction: undefined }
+      { transaction: undefined },
     );
     expect(destroy).not.toHaveBeenCalled();
   });
@@ -121,7 +145,7 @@ describe('putMonthlyData', () => {
         yearMonth: '2026-7',
         userId: 'u1',
       },
-      { transaction: undefined }
+      { transaction: undefined },
     );
   });
 });
