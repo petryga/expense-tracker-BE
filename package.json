@@ -1,7 +1,7 @@
 {
-  "name": "be",
+  "name": "expense-tracker-api",
   "version": "1.0.0",
-  "description": "",
+  "description": "Express + Sequelize + Postgres API for a personal expense & income tracker. Supabase JWT auth, per-user data scoping.",
   "main": "index.ts",
   "type": "module",
   "scripts": {
@@ -16,9 +16,15 @@
     "typecheck": "tsc --noEmit",
     "prepare": "husky"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "express",
+    "sequelize",
+    "postgres",
+    "typescript",
+    "rest-api"
+  ],
+  "author": "Alexandra Petryga",
+  "license": "UNLICENSED",
   "dependencies": {
     "cors": "^2.8.5",
     "csv-writer": "^1.6.0",

@@ -27,3 +27,5 @@ dist-ssr
 .env
 
 output.csv
+# local dev reference, not for the public repo
+DEV_NOTES.md

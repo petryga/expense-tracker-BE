@@ -13,7 +13,12 @@ const makeRes = () => {
   return { status, json } as unknown as { status: ReturnType<typeof vi.fn>; json: ReturnType<typeof vi.fn> };
 };
 
-const ENV_KEYS = ['SUPABASE_URL', 'SUPABASE_JWT_VERIFICATION_MODE', 'SUPABASE_JWT_SECRET'] as const;
+const ENV_KEYS = [
+  'SUPABASE_URL',
+  'SUPABASE_JWT_VERIFICATION_MODE',
+  'SUPABASE_JWT_SECRET',
+  'AUTH_DISABLED',
+] as const;
 
 describe('requireAuth', () => {
   const originalEnv: Record<string, string | undefined> = {};
@@ -36,7 +41,8 @@ describe('requireAuth', () => {
     }
   });
 
-  it('passes through with userId=null when SUPABASE_URL is not configured (local no-auth mode)', async () => {
+  it('passes through with userId=null when SUPABASE_URL is unset and AUTH_DISABLED=true (explicit local no-auth mode)', async () => {
+    process.env.AUTH_DISABLED = 'true';
     const req = { headers: {} } as any;
     const res = makeRes();
     const next = vi.fn();
@@ -46,6 +52,18 @@ describe('requireAuth', () => {
     expect(req.userId).toBeNull();
     expect(next).toHaveBeenCalledOnce();
     expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it('responds 500 when SUPABASE_URL is unset and AUTH_DISABLED is not set (fail closed)', async () => {
+    const req = { headers: {} } as any;
+    const res = makeRes();
+    const next = vi.fn();
+
+    await requireAuth(req, res as any, next);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ error: 'Server auth is not configured' });
+    expect(next).not.toHaveBeenCalled();
   });
 
   it('responds 401 when a token is required but missing', async () => {

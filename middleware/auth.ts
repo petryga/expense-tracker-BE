@@ -39,8 +39,18 @@ const getHs256Secret = (): Uint8Array | null => {
 export const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
   const supabaseUrl = process.env.SUPABASE_URL;
   if (!supabaseUrl) {
-    req.userId = null;
-    next();
+    // Running without Supabase is only allowed when it was asked for explicitly
+    // (local dev, CI). Otherwise this is a misconfigured deploy: fail closed
+    // rather than serving every request as a single shared `userId: null` user.
+    if (process.env.AUTH_DISABLED === 'true') {
+      req.userId = null;
+      next();
+      return;
+    }
+    console.error(
+      'SUPABASE_URL is not set and AUTH_DISABLED is not "true" — refusing to serve unauthenticated requests.'
+    );
+    res.status(500).json({ error: 'Server auth is not configured' });
     return;
   }
 

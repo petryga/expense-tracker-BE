@@ -13,6 +13,12 @@ if (!process.env.DB_DATABASE || !process.env.DB_USERNAME || !process.env.DB_PASS
 const dbHost = process.env.DB_HOST || 'localhost';
 const isLocalDb = dbHost === 'localhost' || dbHost === '127.0.0.1';
 
+// Supabase serves Postgres behind its own CA, which node doesn't trust out of
+// the box, so cert verification is off by default (the connection is still
+// encrypted). Set DB_SSL_REJECT_UNAUTHORIZED=true once the provider's CA is on
+// the system trust store to get full verification.
+const rejectUnauthorized = process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true';
+
 export const sequelize = new Sequelize(
   process.env.DB_DATABASE,
   process.env.DB_USERNAME,
@@ -22,6 +28,6 @@ export const sequelize = new Sequelize(
     port: process.env.DB_PORT ? Number(process.env.DB_PORT) : undefined,
     dialect: 'postgres',
     logging: false,
-    dialectOptions: isLocalDb ? {} : { ssl: { require: true, rejectUnauthorized: false } },
+    dialectOptions: isLocalDb ? {} : { ssl: { require: true, rejectUnauthorized } },
   }
 );
