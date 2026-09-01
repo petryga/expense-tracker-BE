@@ -2,7 +2,7 @@
 
 REST API for a personal expense & income tracker. Express 5 + Sequelize + Postgres, with Supabase JWT authentication and per-user data scoping.
 
-Frontend: **[expense-tracker-FE](https://github.com/petryga/expense-tracker-FE)** · Live demo: _(link)_
+Frontend: **[expense-tracker-FE](https://github.com/petryga/expense-tracker-FE)** · **Live demo:** [expense-tracker-fe-nu.vercel.app](https://expense-tracker-fe-nu.vercel.app) (click **Try the demo**)
 
 ## What it does
 
@@ -37,6 +37,17 @@ seeders/            shared default categories / accounts, and demo templates
 ```
 
 Every route handler filters by `req.userId`; mutations do a `findOne({ where: { id, userId } })` ownership check before touching a row. There is no raw SQL — all queries go through Sequelize.
+
+```mermaid
+flowchart LR
+  FE["expense-tracker-FE"] -->|"Bearer JWT"| H["helmet + CORS allowlist"]
+  H --> RL["rate limit (100 / 15 min / IP)"]
+  RL --> A["requireAuth<br/>verify Supabase JWT → req.userId"]
+  A --> R["resource routers<br/>expenses · income · categories · accounts · …"]
+  R --> M["Sequelize models"]
+  M --> PG[("Postgres")]
+  A -. "no SUPABASE_URL &amp; no AUTH_DISABLED" .-> X["500"]
+```
 
 ## Security
 
