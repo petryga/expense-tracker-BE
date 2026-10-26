@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Express + Sequelize + Postgres API for a personal expense & income tracker. Supabase JWT auth, per-user data scoping.",
   "main": "index.ts",
+  "engines": {
+    "node": "^24.22.1"
+  },
   "type": "module",
   "scripts": {
     "build": "tsc",
