@@ -75,3 +75,9 @@ jobs:
 
       - name: Tests
         run: npm test
+
+      # Unit tests mock Sequelize, so they cannot see transactions, SQL grouping or
+      # races. These run the real routers against a throwaway database (created and
+      # dropped on the service container above) after the same migrations as a deploy.
+      - name: Integration tests
+        run: npm run test:integration

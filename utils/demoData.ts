@@ -96,19 +96,19 @@ export const formatDemoDate = (year: number, month: number, day: number) =>
 
 export const resetDemoUserData = async (userId: string) => {
   await sequelize.transaction(async (transaction) => {
-    await Promise.all([
-      Expense.destroy({ where: { userId }, transaction }),
-      IncomeEntry.destroy({ where: { userId }, transaction }),
-      RecurringExpense.destroy({ where: { userId }, transaction }),
-      RecurringIncomeEntry.destroy({ where: { userId }, transaction }),
-      Account.destroy({ where: { userId }, transaction }),
-      // Not reseeded here - wiping these personal (isDefault:false) rows
-      // just drops the user's owned-category count back to 0, so the next
-      // GET /categories call provisions a fresh starter set automatically
-      // (see services/categories.ts).
-      CategoryBudget.destroy({ where: { userId }, transaction }),
-      Category.destroy({ where: { userId }, transaction }),
-    ]);
+    // One after another: they share a single transaction (one connection), and
+    // pg deprecates issuing a query while another is still running on it.
+    await Expense.destroy({ where: { userId }, transaction });
+    await IncomeEntry.destroy({ where: { userId }, transaction });
+    await RecurringExpense.destroy({ where: { userId }, transaction });
+    await RecurringIncomeEntry.destroy({ where: { userId }, transaction });
+    await Account.destroy({ where: { userId }, transaction });
+    // Not reseeded here - wiping these personal (isDefault:false) rows
+    // just drops the user's owned-category count back to 0, so the next
+    // GET /categories call provisions a fresh starter set automatically
+    // (see services/categories.ts).
+    await CategoryBudget.destroy({ where: { userId }, transaction });
+    await Category.destroy({ where: { userId }, transaction });
 
     const months = getLastNMonths(6);
 

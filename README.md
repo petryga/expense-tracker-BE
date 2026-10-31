@@ -66,6 +66,8 @@ npm run seed
 npm run dev                   # http://localhost:3000
 ```
 
+**Integration tests** (`npm run test:integration`) run the real routers against a real Postgres: they create a throwaway `et_test_integration` database on the server in `BE/.env` (Homebrew on 5432 is fine, no Docker needed), apply every migration, run, and drop it. They refuse to run unless `DB_HOST` is `localhost`/`127.0.0.1`, so they can never touch Supabase. Plain `npm test` stays database-free.
+
 Need a throwaway Postgres? `docker compose up -d` starts one on `127.0.0.1:5433` (set `DB_PORT=5433`). It's for rehearsing migrations against a disposable database — see `docker-compose.yml`.
 
 To enable auth, set `SUPABASE_URL` (and drop `AUTH_DISABLED`); the frontend must then send Supabase access tokens.
