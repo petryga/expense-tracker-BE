@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 
@@ -56,9 +56,13 @@ describe('CORS', () => {
 });
 
 describe('rate limiting', () => {
+  // A developer's .env may switch the limiter off; the test must not depend on it.
+  afterEach(() => vi.unstubAllEnvs());
+
   it('allows up to the configured limit and blocks the request after it with 429', async () => {
     // Isolated instance/app so this doesn't share counters with the
     // app-wide limiter or other tests.
+    vi.stubEnv('RATE_LIMIT_DISABLED', 'false');
     const limiter = createApiLimiter();
     const testApp = express();
     testApp.use(limiter);
@@ -71,5 +75,20 @@ describe('rate limiting', () => {
 
     const blocked = await request(testApp).get('/');
     expect(blocked.status).toBe(429);
+  });
+});
+
+describe('rate limiting switch', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('is skipped entirely when RATE_LIMIT_DISABLED=true', async () => {
+    vi.stubEnv('RATE_LIMIT_DISABLED', 'true');
+    const testApp = express();
+    testApp.use(createApiLimiter());
+    testApp.get('/', (req, res) => res.status(200).json({ ok: true }));
+
+    for (let i = 0; i < 105; i++) {
+      expect((await request(testApp).get('/')).status).toBe(200);
+    }
   });
 });

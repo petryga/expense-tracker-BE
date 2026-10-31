@@ -28,6 +28,8 @@ export const createApiLimiter = () =>
     limit: 100,
     standardHeaders: true,
     legacyHeaders: false,
+    // Local development only: set RATE_LIMIT_DISABLED=true in .env to switch it off.
+    skip: () => process.env.RATE_LIMIT_DISABLED === 'true',
   });
 
 export const app = express();
