@@ -117,3 +117,37 @@ describe('PUT /:id', () => {
     expect(updated).not.toHaveProperty('updatedAt');
   });
 });
+
+describe('dayOfMonth validation', () => {
+  it.each([0, 32, -1, 1.5, '12', null, undefined])('POST rejects dayOfMonth %s', async (dayOfMonth) => {
+    const createSpy = vi.spyOn(RecurringExpense, 'create');
+    const res = mockRes();
+
+    await getHandler('post', '/')({ userId: 'u1', body: { dayOfMonth } } as unknown as Request, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(createSpy).not.toHaveBeenCalled();
+  });
+
+  it.each([1, 31])('POST accepts dayOfMonth %s', async (dayOfMonth) => {
+    vi.spyOn(RecurringExpense, 'create').mockImplementation(async (data: any) => data as any);
+    const res = mockRes();
+
+    await getHandler('post', '/')({ userId: 'u1', body: { dayOfMonth } } as unknown as Request, res);
+
+    expect(res.status).toHaveBeenCalledWith(201);
+  });
+
+  it('PUT rejects an out-of-range dayOfMonth without touching the DB', async () => {
+    const findSpy = vi.spyOn(RecurringExpense, 'findOne');
+    const res = mockRes();
+
+    await getHandler('put', '/:id')(
+      { userId: 'u1', params: { id: 'r1' }, body: { dayOfMonth: 32 } } as unknown as Request,
+      res,
+    );
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(findSpy).not.toHaveBeenCalled();
+  });
+});

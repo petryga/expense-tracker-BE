@@ -26,7 +26,14 @@ const pickRecurringExpenseFields = (body: Record<string, unknown>) => {
   return { id, category, amount, account, description, dayOfMonth, currency };
 };
 
+const isValidDayOfMonth = (value: unknown) =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 31;
+
 router.post('/', async (req, res) => {
+  if (!isValidDayOfMonth(req.body?.dayOfMonth)) {
+    return res.status(400).json({ error: 'dayOfMonth must be an integer between 1 and 31' });
+  }
+
   try {
     const newRecurringExpense = await RecurringExpense.create({
       ...pickRecurringExpenseFields(req.body),
@@ -43,6 +50,9 @@ router.put('/:id', async (req, res) => {
   const { id } = req.params;
   if (!id) {
     return res.status(400).json({ error: 'Invalid request' });
+  }
+  if (!isValidDayOfMonth(req.body?.dayOfMonth)) {
+    return res.status(400).json({ error: 'dayOfMonth must be an integer between 1 and 31' });
   }
 
   try {
