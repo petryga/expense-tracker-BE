@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import expensesRouter from './services/expenses.js';
 import monthlyData from './services/monthlyData.js';
+import reports from './services/reports.js';
 import incomeEntries from './services/incomeEntries.js';
 import exportCsV from './services/exportCsv.js';
 import recurringExpenses from './services/recurringExpenses.js';
@@ -83,6 +84,7 @@ app.use(requireAuth);
 
 app.use('/expenses', expensesRouter);
 app.use('/monthlyData', monthlyData);
+app.use('/reports', reports);
 app.use('/income', incomeEntries);
 app.use('/export', exportCsV);
 app.use('/recurringExpenses', recurringExpenses);
