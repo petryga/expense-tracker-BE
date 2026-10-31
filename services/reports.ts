@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { Currency } from '../models/Expense.js';
 import { getMonthlyTotals } from '../utils/monthlyTotals.js';
 import { buildYearlyComparison, type CutoffsByYear } from '../utils/yearlyComparison.js';
+import { getMonthlyReport, getReportMonths } from '../utils/monthlyReport.js';
 import { handleError } from '../utils/common.js';
 
 const router = Router();
@@ -41,6 +42,31 @@ router.get('/yearly-comparison', async (req, res) => {
     res.json(buildYearlyComparison({ monthly, mode, baseCurrency, cutoffs }));
   } catch (error) {
     handleError(res, error, 'Failed to build yearly comparison');
+  }
+});
+
+//   GET /reports/months                    -> ["2026-10", "2026-09", ...]
+router.get('/months', async (req, res) => {
+  try {
+    res.json(await getReportMonths(req.userId));
+  } catch (error) {
+    handleError(res, error, 'Failed to list report months');
+  }
+});
+
+//   GET /reports/monthly?yearMonth=2026-10
+router.get('/monthly', async (req, res) => {
+  const { yearMonth } = req.query;
+  const match = typeof yearMonth === 'string' ? /^(\d{4})-(\d{2})$/.exec(yearMonth) : null;
+  const month = match ? parseInt(match[2], 10) : 0;
+  if (!match || month < 1 || month > 12) {
+    return res.status(400).json({ error: 'yearMonth must look like 2026-10' });
+  }
+
+  try {
+    res.json(await getMonthlyReport(req.userId, parseInt(match[1], 10), month));
+  } catch (error) {
+    handleError(res, error, 'Failed to build monthly report');
   }
 });
 

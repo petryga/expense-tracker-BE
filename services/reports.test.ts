@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Request, Response } from 'express';
 import router from './reports.js';
 import * as monthlyTotals from '../utils/monthlyTotals.js';
+import * as monthlyReport from '../utils/monthlyReport.js';
 
 const handler = (() => {
   const layer = (router.stack as any[]).find(
@@ -23,17 +24,15 @@ afterEach(() => {
 
 describe('GET /reports/yearly-comparison', () => {
   it("sums only the requesting user's expenses and returns the comparison", async () => {
-    const spy = vi
-      .spyOn(monthlyTotals, 'getMonthlyTotals')
-      .mockResolvedValue([
-        {
-          id: 'expense-2026-01',
-          type: 'expense',
-          yearMonth: '2026-01',
-          amountCad: '100.00',
-          amountUsd: '0.00',
-        },
-      ]);
+    const spy = vi.spyOn(monthlyTotals, 'getMonthlyTotals').mockResolvedValue([
+      {
+        id: 'expense-2026-01',
+        type: 'expense',
+        yearMonth: '2026-01',
+        amountCad: '100.00',
+        amountUsd: '0.00',
+      },
+    ]);
     const res = mockRes();
 
     await handler({ query: {}, userId: 'u1' } as unknown as Request, res);
@@ -72,6 +71,49 @@ describe('GET /reports/yearly-comparison', () => {
     const res = mockRes();
 
     await handler({ query, userId: 'u1' } as unknown as Request, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /reports/monthly', () => {
+  const monthlyHandler = (() => {
+    const layer = (router.stack as any[]).find(
+      (l) => l.route?.path === '/monthly' && l.route?.methods?.get,
+    );
+    return layer.route.stack[0].handle as (req: Request, res: Response) => Promise<void>;
+  })();
+
+  it('builds the report for the requested month and user', async () => {
+    const spy = vi.spyOn(monthlyReport, 'getMonthlyReport').mockResolvedValue({
+      yearMonth: '2026-10',
+      dataByCategory: [],
+      totalSpentCad: 0,
+      totalSpentUsd: 0,
+    });
+    const res = mockRes();
+
+    await monthlyHandler(
+      { query: { yearMonth: '2026-10' }, userId: 'u1' } as unknown as Request,
+      res,
+    );
+
+    expect(spy).toHaveBeenCalledWith('u1', 2026, 10);
+    expect(res.json).toHaveBeenCalled();
+  });
+
+  it.each([
+    {},
+    { yearMonth: '2026-13' },
+    { yearMonth: '2026-00' },
+    { yearMonth: '2026-1' },
+    { yearMonth: ['2026-10'] },
+  ])('rejects %j with 400', async (query) => {
+    const spy = vi.spyOn(monthlyReport, 'getMonthlyReport');
+    const res = mockRes();
+
+    await monthlyHandler({ query, userId: 'u1' } as unknown as Request, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(spy).not.toHaveBeenCalled();
