@@ -1,9 +1,7 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, vi, afterEach } from 'vitest';
 import type { Request, Response } from 'express';
 import router from './incomeEntries.js';
 import { Currency, IncomeEntry } from '../models/IncomeEntry.js';
-import { MonthlyData } from '../models/MonthlyData.js';
-import { sequelize } from '../config/database.js';
 
 // Express stores each router.<method>(path, handler) registration as a Layer
 // with a nested route.stack; pulling the raw handler out lets us exercise it
@@ -24,106 +22,48 @@ const mockRes = () => {
   return res as Response;
 };
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe('DELETE /:id', () => {
   const handler = getHandler('delete', '/:id');
 
-  beforeEach(() => {
-    vi.spyOn(sequelize, 'transaction').mockImplementation(((fn: any) => fn({} as any)) as any);
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it('removes the entry before recalculating the monthly total, so the deleted amount is excluded', async () => {
-    // A tiny stateful mock stands in for the DB: findAll only "sees" the
-    // entry until destroy() has actually run. Regression: the old handler
-    // called putMonthlyData (which reads via findAll) before destroy(), so
-    // the deleted entry's amount was still counted in the recalculated total.
-    let deleted = false;
+  it('deletes the entry and responds 204', async () => {
     const incomeEntry = {
       id: 'e1',
       userId: 'u1',
-      date: '2026-07-15',
-      currency: Currency.CAD,
-      amount: '100',
-      destroy: vi.fn().mockImplementation(async () => {
-        deleted = true;
-      }),
+      destroy: vi.fn().mockResolvedValue(undefined),
     } as unknown as IncomeEntry;
-
     vi.spyOn(IncomeEntry, 'findOne').mockResolvedValue(incomeEntry);
-    vi.spyOn(IncomeEntry, 'findAll').mockImplementation(async () => (deleted ? [] : [incomeEntry]));
-
-    const monthlyDataDestroy = vi.fn().mockResolvedValue(undefined);
-    const monthlyDataUpdate = vi.fn().mockResolvedValue(undefined);
-    vi.spyOn(MonthlyData, 'findOne').mockResolvedValue({
-      destroy: monthlyDataDestroy,
-      update: monthlyDataUpdate,
-    } as any);
-
-    const req = { params: { id: 'e1' }, userId: 'u1' } as unknown as Request;
     const res = mockRes();
 
-    await handler(req, res);
+    await handler({ params: { id: 'e1' }, userId: 'u1' } as unknown as Request, res);
 
-    // Totals recalculate to zero only if the entry was already gone by the
-    // time putMonthlyData ran, which is what drives the row to be destroyed
-    // instead of updated with the stale (pre-deletion) amount.
-    expect(monthlyDataDestroy).toHaveBeenCalledOnce();
-    expect(monthlyDataUpdate).not.toHaveBeenCalled();
+    expect(incomeEntry.destroy).toHaveBeenCalledOnce();
     expect(res.status).toHaveBeenCalledWith(204);
   });
 
-  it('runs the delete before the recalculation query, regardless of totals', async () => {
-    const incomeEntry = {
-      id: 'e1',
-      userId: 'u1',
-      date: '2026-07-15',
-      currency: Currency.CAD,
-      amount: '100',
-      destroy: vi.fn().mockResolvedValue(undefined),
-    } as unknown as IncomeEntry;
-
-    vi.spyOn(IncomeEntry, 'findOne').mockResolvedValue(incomeEntry);
-    const findAllSpy = vi.spyOn(IncomeEntry, 'findAll').mockResolvedValue([]);
-    vi.spyOn(MonthlyData, 'findOne').mockResolvedValue({
-      destroy: vi.fn(),
-      update: vi.fn(),
-    } as any);
-
-    const req = { params: { id: 'e1' }, userId: 'u1' } as unknown as Request;
+  it('only looks up entries owned by the requesting user', async () => {
+    const findOne = vi.spyOn(IncomeEntry, 'findOne').mockResolvedValue(null);
     const res = mockRes();
 
-    await handler(req, res);
+    await handler({ params: { id: 'e1' }, userId: 'u1' } as unknown as Request, res);
 
-    const destroyOrder = vi.mocked(incomeEntry.destroy).mock.invocationCallOrder[0];
-    const findAllOrder = findAllSpy.mock.invocationCallOrder[0];
-    expect(destroyOrder).toBeLessThan(findAllOrder);
+    expect(findOne).toHaveBeenCalledWith({ where: { id: 'e1', userId: 'u1' } });
+    expect(res.status).toHaveBeenCalledWith(404);
   });
 });
 
 describe('PUT /:id', () => {
   const handler = getHandler('put', '/:id');
 
-  beforeEach(() => {
-    vi.spyOn(sequelize, 'transaction').mockImplementation(((fn: any) => fn({} as any)) as any);
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   it('does not mass-assign unexpected fields on update (e.g. a forged userId or createdAt)', async () => {
     const update = vi
       .fn()
       .mockImplementation(async (data: any) => ({ ...data, date: '2026-07-15' }));
     const incomeEntry = { id: 'e1', userId: 'u1', update } as unknown as IncomeEntry;
-
     vi.spyOn(IncomeEntry, 'findOne').mockResolvedValue(incomeEntry);
-    vi.spyOn(IncomeEntry, 'findAll').mockResolvedValue([]);
-    vi.spyOn(MonthlyData, 'findOne').mockResolvedValue(null);
-    vi.spyOn(MonthlyData, 'create').mockResolvedValue({} as any);
 
     const req = {
       params: { id: 'e1' },
@@ -138,25 +78,37 @@ describe('PUT /:id', () => {
         createdAt: '1999-01-01T00:00:00.000Z',
       },
     } as unknown as Request;
-    const res = mockRes();
 
-    await handler(req, res);
+    await handler(req, mockRes());
 
     const updated = update.mock.calls[0][0] as Record<string, unknown>;
     expect(updated.userId).toBe('u1');
     expect(updated).not.toHaveProperty('createdAt');
+  });
+
+  it('rejects an invalid date with a 400 and leaves the entry untouched', async () => {
+    const update = vi.fn();
+    vi.spyOn(IncomeEntry, 'findOne').mockResolvedValue({ id: 'e1', update } as any);
+    const res = mockRes();
+
+    await handler(
+      {
+        params: { id: 'e1' },
+        userId: 'u1',
+        body: { date: 'soon', description: 'x', category: 'cash', amount: '1' },
+      } as unknown as Request,
+      res,
+    );
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(update).not.toHaveBeenCalled();
   });
 });
 
 describe('POST /', () => {
   const handler = getHandler('post', '/');
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   it('rejects an invalid date with a 400 and writes nothing', async () => {
-    vi.spyOn(sequelize, 'transaction').mockImplementation(((fn: any) => fn({} as any)) as any);
     const create = vi.spyOn(IncomeEntry, 'create');
     const bulkCreate = vi.spyOn(IncomeEntry, 'bulkCreate');
     const base = { description: 'x', category: 'cash', amount: '1', currency: Currency.USD };
@@ -179,42 +131,26 @@ describe('POST /', () => {
     expect(create).not.toHaveBeenCalled();
     expect(bulkCreate).not.toHaveBeenCalled();
   });
-});
 
-describe('PUT /:id', () => {
-  const handler = getHandler('put', '/:id');
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it('recomputes the month the entry left as well as the one it moved to', async () => {
-    vi.spyOn(sequelize, 'transaction').mockImplementation(((fn: any) => fn({} as any)) as any);
-    const entry: any = { id: 'e1', userId: 'u1', date: '2026-07-15', currency: Currency.USD };
-    entry.update = vi.fn().mockImplementation(async (data: any) => Object.assign(entry, data));
-    vi.spyOn(IncomeEntry, 'findOne').mockResolvedValue(entry);
-    const findAll = vi.spyOn(IncomeEntry, 'findAll').mockResolvedValue([]);
-    vi.spyOn(MonthlyData, 'findOne').mockResolvedValue(null as any);
+  it('creates a valid entry owned by the requesting user', async () => {
+    const create = vi.spyOn(IncomeEntry, 'create').mockImplementation(async (d: any) => d);
+    const res = mockRes();
 
     await handler(
       {
-        params: { id: 'e1' },
         body: {
-          date: '2026-08-02',
+          date: '2026-10-31',
           description: 'x',
           category: 'cash',
           amount: '1',
           currency: 'USD',
         },
         userId: 'u1',
-      } as any,
-      mockRes(),
+      } as Request,
+      res,
     );
 
-    const prefixes = findAll.mock.calls.map(([options]) => {
-      const dateFilter = (options as any).where.date;
-      return dateFilter[Object.getOwnPropertySymbols(dateFilter)[0]];
-    });
-    expect(prefixes).toEqual(['2026-08', '2026-07']);
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ userId: 'u1' }));
+    expect(res.status).toHaveBeenCalledWith(201);
   });
 });

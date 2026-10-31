@@ -1,9 +1,7 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, vi, afterEach } from 'vitest';
 import type { Request, Response } from 'express';
 import router from './expenses.js';
 import { Currency, Expense } from '../models/Expense.js';
-import { MonthlyData } from '../models/MonthlyData.js';
-import { sequelize } from '../config/database.js';
 
 // Pulls the raw handler out of the router so it can be exercised without an
 // HTTP server (same approach as incomeEntries.test.ts).
@@ -32,10 +30,6 @@ const body = {
   id: 'e1',
   currency: Currency.USD,
 };
-
-beforeEach(() => {
-  vi.spyOn(sequelize, 'transaction').mockImplementation(((fn: any) => fn({} as any)) as any);
-});
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -85,34 +79,18 @@ describe('PUT /:id', () => {
     expect(expense.update).not.toHaveBeenCalled();
   });
 
-  it('recomputes the month the expense left as well as the one it moved to', async () => {
-    // Regression: only the new month was recomputed, so the old month's rollup
-    // kept the moved amount forever (the July 2026 USD drift).
-    stubExpense(2026, 7);
-    const findAll = vi.spyOn(Expense, 'findAll').mockResolvedValue([]);
-    vi.spyOn(MonthlyData, 'findOne').mockResolvedValue(null as any);
-
+  it('updates the expense when the date is valid, including a move to another month', async () => {
+    const expense = stubExpense(2026, 7);
     const res = mockRes();
+
     await handler(
       { params: { id: 'e1' }, body: { ...body, datePosted: '2026-08-02' }, userId: 'u1' } as any,
       res,
     );
 
-    const recomputed = findAll.mock.calls.map(([options]) => (options as any).where.month);
-    expect(recomputed).toEqual([8, 7]);
-    expect(res.status).not.toHaveBeenCalledWith(500);
-  });
-
-  it('recomputes just the one month when the date stays in the same month', async () => {
-    stubExpense(2026, 8);
-    const findAll = vi.spyOn(Expense, 'findAll').mockResolvedValue([]);
-    vi.spyOn(MonthlyData, 'findOne').mockResolvedValue(null as any);
-
-    await handler(
-      { params: { id: 'e1' }, body: { ...body, datePosted: '2026-08-20' }, userId: 'u1' } as any,
-      mockRes(),
+    expect(expense.update).toHaveBeenCalledWith(
+      expect.objectContaining({ year: 2026, month: 8, userId: 'u1' }),
     );
-
-    expect(findAll).toHaveBeenCalledTimes(1);
+    expect(res.status).toHaveBeenCalledWith(200);
   });
 });

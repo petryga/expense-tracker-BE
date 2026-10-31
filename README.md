@@ -8,7 +8,7 @@ Frontend: **[expense-tracker-FE](https://github.com/petryga/expense-tracker-FE)*
 
 - Expenses and income entries, with recurring templates that materialise on a schedule
 - User-defined categories with per-category monthly budgets, plus a shared set of defaults
-- Accounts, and a rolling `MonthlyData` summary kept in sync as entries change
+- Accounts, and monthly totals computed on read from the expenses/income tables (no stored rollup)
 - CSV export of all expenses
 - A **demo account**: when `DEMO_USER_ID` is set, that user's data is wiped and reseeded with fresh fake data on every login, so the public demo always looks alive without exposing real data
 

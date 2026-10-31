@@ -1,12 +1,6 @@
 import { Router } from 'express';
 import { IncomeEntry } from '../models/IncomeEntry.js';
-import {
-  createIncomeEntryObject,
-  postMonthlyData,
-  putMonthlyData,
-  syncMonthlyDataAfterUpdate,
-} from '../utils/incomeEntriesUtils.js';
-import { sequelize } from '../config/database.js';
+import { createIncomeEntryObject } from '../utils/incomeEntriesUtils.js';
 import { handleError } from '../utils/common.js';
 
 const router = Router();
@@ -33,25 +27,14 @@ router.post('/', async (req, res) => {
     if (Array.isArray(req.body)) {
       const incomeEntries = req.body.map((item) => createIncomeEntryObject(item, userId));
 
-      const newIncomeEntries = await sequelize.transaction(async (transaction) => {
-        const created = await IncomeEntry.bulkCreate(incomeEntries, { transaction });
-
-        for (const incomeEntry of created) {
-          await postMonthlyData({ incomeEntry, transaction });
-        }
-        return created;
-      });
+      const newIncomeEntries = await IncomeEntry.bulkCreate(incomeEntries);
 
       res.status(201).json(newIncomeEntries);
       return;
     }
 
     const income = createIncomeEntryObject(req.body, userId);
-    const newIncomeEntry = await sequelize.transaction(async (transaction) => {
-      const created = await IncomeEntry.create(income, { transaction });
-      await postMonthlyData({ incomeEntry: created, transaction });
-      return created;
-    });
+    const newIncomeEntry = await IncomeEntry.create(income);
 
     res.status(201).json(newIncomeEntry);
   } catch (error) {
@@ -71,14 +54,9 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Income entry not found' });
     }
 
-    const previousDate = incomeEntry.date;
-    const updatedIncomeEntry = await sequelize.transaction(async (transaction) => {
-      const updated = await incomeEntry.update(createIncomeEntryObject(req.body, req.userId), {
-        transaction,
-      });
-      await syncMonthlyDataAfterUpdate({ previousDate, incomeEntry: updated, transaction });
-      return updated;
-    });
+    const updatedIncomeEntry = await incomeEntry.update(
+      createIncomeEntryObject(req.body, req.userId),
+    );
 
     res.json(updatedIncomeEntry);
   } catch (error) {
@@ -98,10 +76,7 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Income entry not found' });
     }
 
-    await sequelize.transaction(async (transaction) => {
-      await incomeEntry.destroy({ transaction });
-      await putMonthlyData({ incomeEntry, transaction });
-    });
+    await incomeEntry.destroy();
 
     res.status(204).end();
   } catch (error) {

@@ -3,15 +3,11 @@ import { Currency, Expense } from '../models/Expense.js';
 import { IncomeEntry } from '../models/IncomeEntry.js';
 import { RecurringExpense } from '../models/RecurringExpense.js';
 import { RecurringIncomeEntry } from '../models/RecurringIncomeEntry.js';
-import { MonthlyData } from '../models/MonthlyData.js';
 import { Account } from '../models/Account.js';
 import { Category } from '../models/Category.js';
 import { CategoryBudget } from '../models/CategoryBudget.js';
-import { createExpenseObject, postMonthlyData as postExpenseMonthlyData } from './expensesUtils.js';
-import {
-  createIncomeEntryObject,
-  postMonthlyData as postIncomeMonthlyData,
-} from './incomeEntriesUtils.js';
+import { createExpenseObject } from './expensesUtils.js';
+import { createIncomeEntryObject } from './incomeEntriesUtils.js';
 
 // Fictional accounts, not the real account names anyone using this app
 // actually has - "Cash" alone comes from the global default account seed,
@@ -105,7 +101,6 @@ export const resetDemoUserData = async (userId: string) => {
       IncomeEntry.destroy({ where: { userId }, transaction }),
       RecurringExpense.destroy({ where: { userId }, transaction }),
       RecurringIncomeEntry.destroy({ where: { userId }, transaction }),
-      MonthlyData.destroy({ where: { userId }, transaction }),
       Account.destroy({ where: { userId }, transaction }),
       // Not reseeded here - wiping these personal (isDefault:false) rows
       // just drops the user's owned-category count back to 0, so the next
@@ -134,8 +129,7 @@ export const resetDemoUserData = async (userId: string) => {
           userId,
         );
 
-        const expense = await Expense.create(expenseObject, { transaction });
-        await postExpenseMonthlyData({ expense, transaction });
+        await Expense.create(expenseObject, { transaction });
       }
 
       for (const template of INCOME_TEMPLATES) {
@@ -149,14 +143,13 @@ export const resetDemoUserData = async (userId: string) => {
           userId,
         );
 
-        const incomeEntry = await IncomeEntry.create(
+        await IncomeEntry.create(
           {
             ...incomeObject,
             currency: 'CAD',
           },
           { transaction },
         );
-        await postIncomeMonthlyData({ incomeEntry, transaction });
       }
     }
 
