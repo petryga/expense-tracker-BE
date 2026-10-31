@@ -3,6 +3,7 @@ import { Currency } from '../models/Expense.js';
 import { getMonthlyTotals } from '../utils/monthlyTotals.js';
 import { buildYearlyComparison, type CutoffsByYear } from '../utils/yearlyComparison.js';
 import { getMonthlyReport, getReportMonths } from '../utils/monthlyReport.js';
+import { getFlowReport } from '../utils/flowReport.js';
 import { handleError } from '../utils/common.js';
 
 const router = Router();
@@ -67,6 +68,24 @@ router.get('/monthly', async (req, res) => {
     res.json(await getMonthlyReport(req.userId, parseInt(match[1], 10), month));
   } catch (error) {
     handleError(res, error, 'Failed to build monthly report');
+  }
+});
+
+//   GET /reports/flow            -> latest eligible month
+//   GET /reports/flow?month=2026-10
+router.get('/flow', async (req, res) => {
+  const { month } = req.query;
+  if (
+    month !== undefined &&
+    (typeof month !== 'string' || !/^\d{4}-(0[1-9]|1[0-2])$/.test(month))
+  ) {
+    return res.status(400).json({ error: 'month must look like 2026-10' });
+  }
+
+  try {
+    res.json(await getFlowReport(req.userId, month));
+  } catch (error) {
+    handleError(res, error, 'Failed to build flow report');
   }
 });
 

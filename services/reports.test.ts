@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import router from './reports.js';
 import * as monthlyTotals from '../utils/monthlyTotals.js';
 import * as monthlyReport from '../utils/monthlyReport.js';
+import * as flowReport from '../utils/flowReport.js';
 
 const handler = (() => {
   const layer = (router.stack as any[]).find(
@@ -118,4 +119,39 @@ describe('GET /reports/monthly', () => {
     expect(res.status).toHaveBeenCalledWith(400);
     expect(spy).not.toHaveBeenCalled();
   });
+});
+
+describe('GET /reports/flow', () => {
+  const flowHandler = (() => {
+    const layer = (router.stack as any[]).find(
+      (l) => l.route?.path === '/flow' && l.route?.methods?.get,
+    );
+    return layer.route.stack[0].handle as (req: Request, res: Response) => Promise<void>;
+  })();
+
+  it('passes the user and optional month through', async () => {
+    const spy = vi.spyOn(flowReport, 'getFlowReport').mockResolvedValue({} as any);
+
+    await flowHandler(
+      { query: { month: '2026-10' }, userId: 'u1' } as unknown as Request,
+      mockRes(),
+    );
+    await flowHandler({ query: {}, userId: 'u1' } as unknown as Request, mockRes());
+
+    expect(spy).toHaveBeenNthCalledWith(1, 'u1', '2026-10');
+    expect(spy).toHaveBeenNthCalledWith(2, 'u1', undefined);
+  });
+
+  it.each([{ month: '2026-13' }, { month: 'soon' }, { month: ['2026-10'] }])(
+    'rejects %j with 400',
+    async (query) => {
+      const spy = vi.spyOn(flowReport, 'getFlowReport');
+      const res = mockRes();
+
+      await flowHandler({ query, userId: 'u1' } as unknown as Request, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(spy).not.toHaveBeenCalled();
+    },
+  );
 });
