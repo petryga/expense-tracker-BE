@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createExpenseObject } from './expensesUtils.js';
 import { Currency } from '../models/Expense.js';
+import { InvalidDateError } from './dates.js';
 
 const baseBody = {
   category: 'Groceries',
@@ -59,4 +60,27 @@ describe('createExpenseObject', () => {
     expect(result).not.toHaveProperty('createdAt');
     expect(result).not.toHaveProperty('isAdmin');
   });
+
+  it('reads year/month from a legacy ISO timestamp regardless of server time zone', () => {
+    const result = createExpenseObject(
+      { ...baseBody, datePosted: '2024-12-01T03:00:00.000Z' },
+      null,
+    );
+    expect(result.year).toBe(2024);
+    expect(result.month).toBe(12);
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['empty', ''],
+    ['garbled', 'yesterday'],
+    ['impossible', '2026-02-30'],
+  ])(
+    'throws InvalidDateError when datePosted is %s instead of storing null year/month',
+    (_l, v) => {
+      expect(() => createExpenseObject({ ...baseBody, datePosted: v as any }, 'user-1')).toThrow(
+        InvalidDateError,
+      );
+    },
+  );
 });

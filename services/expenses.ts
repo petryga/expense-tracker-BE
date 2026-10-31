@@ -1,6 +1,11 @@
 import { Router } from 'express';
 import { Currency, Expense } from '../models/Expense.js';
-import { createExpenseObject, putMonthlyData, postMonthlyData } from '../utils/expensesUtils.js';
+import {
+  createExpenseObject,
+  putMonthlyData,
+  postMonthlyData,
+  syncMonthlyDataAfterUpdate,
+} from '../utils/expensesUtils.js';
 import { Op } from 'sequelize';
 import { sequelize } from '../config/database.js';
 import { handleError } from '../utils/common.js';
@@ -221,10 +226,11 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Expense not found' });
     }
 
+    const previous = { year: expense.year, month: expense.month, userId: expense.userId };
     const updatedExpenseData = createExpenseObject(req.body, req.userId);
     await sequelize.transaction(async (transaction) => {
       await expense.update(updatedExpenseData, { transaction });
-      await putMonthlyData({ expense, transaction });
+      await syncMonthlyDataAfterUpdate({ previous, expense, transaction });
     });
     res.status(200).json(expense);
   } catch (error) {

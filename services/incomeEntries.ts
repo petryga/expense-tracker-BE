@@ -4,6 +4,7 @@ import {
   createIncomeEntryObject,
   postMonthlyData,
   putMonthlyData,
+  syncMonthlyDataAfterUpdate,
 } from '../utils/incomeEntriesUtils.js';
 import { sequelize } from '../config/database.js';
 import { handleError } from '../utils/common.js';
@@ -70,11 +71,12 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Income entry not found' });
     }
 
+    const previousDate = incomeEntry.date;
     const updatedIncomeEntry = await sequelize.transaction(async (transaction) => {
       const updated = await incomeEntry.update(createIncomeEntryObject(req.body, req.userId), {
         transaction,
       });
-      await putMonthlyData({ incomeEntry: updated, transaction });
+      await syncMonthlyDataAfterUpdate({ previousDate, incomeEntry: updated, transaction });
       return updated;
     });
 

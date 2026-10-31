@@ -17,6 +17,7 @@
     "test": "vitest run",
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "typecheck": "tsc --noEmit",
+    "rebuild:monthly-data": "tsx scripts/rebuildMonthlyData.ts",
     "prepare": "husky",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

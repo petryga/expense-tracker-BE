@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createIncomeEntryObject } from './incomeEntriesUtils.js';
+import { InvalidDateError } from './dates.js';
 
 const baseBody = {
   date: '2026-07-11',
@@ -51,5 +52,21 @@ describe('createIncomeEntryObject', () => {
 
     expect(result).not.toHaveProperty('createdAt');
     expect(result).not.toHaveProperty('isAdmin');
+  });
+
+  it('accepts a legacy ISO timestamp date', () => {
+    const result = createIncomeEntryObject({ ...baseBody, date: '2024-07-30T07:00:00.000Z' }, null);
+    expect(result.date).toBe('2024-07-30T07:00:00.000Z');
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['slash-formatted', '2026/10/31'],
+    ['garbled', 'soon'],
+    ['impossible', '2026-04-31'],
+  ])('throws InvalidDateError when date is %s', (_l, v) => {
+    expect(() => createIncomeEntryObject({ ...baseBody, date: v as any }, 'user-1')).toThrow(
+      InvalidDateError,
+    );
   });
 });

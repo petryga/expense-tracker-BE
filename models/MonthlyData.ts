@@ -1,4 +1,4 @@
-import { Model, DataTypes } from 'sequelize';
+import { Model, DataTypes, UniqueConstraintError, type Transaction } from 'sequelize';
 import { sequelize } from '../config/database.js';
 
 export enum MonthlyDataTypes {
@@ -14,6 +14,41 @@ export class MonthlyData extends Model {
   declare yearMonth: string;
   declare month: number;
   declare userId: string;
+
+  // Find the rollup row for (user, type, month) or create it, safely under
+  // concurrency. The unique index makes a losing racer's INSERT fail, which in
+  // Postgres aborts the whole surrounding transaction unless the INSERT runs
+  // in its own savepoint, so it does. On a conflict the winner's (by then
+  // committed) row is re-read and handed back with created = false so the
+  // caller adds its amount to it.
+  //
+  // Not Sequelize's findOrCreate: its unique-violation recovery calls
+  // `.toString()` on each conflicting column value and throws a TypeError when
+  // user_id is NULL, which is every row in no-auth/local mode.
+  static async findOrCreateRow({
+    where,
+    defaults,
+    transaction,
+  }: {
+    where: { yearMonth: string; type: MonthlyDataTypes; userId: string | null };
+    defaults: { amountCad: number; amountUsd: number };
+    transaction?: Transaction;
+  }): Promise<[MonthlyData, boolean]> {
+    const existing = await MonthlyData.findOne({ where, transaction });
+    if (existing) return [existing, false];
+
+    try {
+      const created = await sequelize.transaction({ transaction }, (savepoint) =>
+        MonthlyData.create({ ...where, ...defaults }, { transaction: savepoint }),
+      );
+      return [created, true];
+    } catch (error) {
+      if (!(error instanceof UniqueConstraintError)) throw error;
+      const winner = await MonthlyData.findOne({ where, transaction });
+      if (!winner) throw error;
+      return [winner, false];
+    }
+  }
 }
 
 MonthlyData.init(

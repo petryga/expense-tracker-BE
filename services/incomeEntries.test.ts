@@ -147,3 +147,74 @@ describe('PUT /:id', () => {
     expect(updated).not.toHaveProperty('createdAt');
   });
 });
+
+describe('POST /', () => {
+  const handler = getHandler('post', '/');
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('rejects an invalid date with a 400 and writes nothing', async () => {
+    vi.spyOn(sequelize, 'transaction').mockImplementation(((fn: any) => fn({} as any)) as any);
+    const create = vi.spyOn(IncomeEntry, 'create');
+    const bulkCreate = vi.spyOn(IncomeEntry, 'bulkCreate');
+    const base = { description: 'x', category: 'cash', amount: '1', currency: Currency.USD };
+    const res = mockRes();
+
+    await handler({ body: { ...base, date: '2026/10/31' }, userId: 'u1' } as Request, res);
+    await handler(
+      {
+        body: [
+          { ...base, date: '2026-10-31' },
+          { ...base, date: 'soon' },
+        ],
+        userId: 'u1',
+      } as Request,
+      res,
+    );
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.status).not.toHaveBeenCalledWith(500);
+    expect(create).not.toHaveBeenCalled();
+    expect(bulkCreate).not.toHaveBeenCalled();
+  });
+});
+
+describe('PUT /:id', () => {
+  const handler = getHandler('put', '/:id');
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('recomputes the month the entry left as well as the one it moved to', async () => {
+    vi.spyOn(sequelize, 'transaction').mockImplementation(((fn: any) => fn({} as any)) as any);
+    const entry: any = { id: 'e1', userId: 'u1', date: '2026-07-15', currency: Currency.USD };
+    entry.update = vi.fn().mockImplementation(async (data: any) => Object.assign(entry, data));
+    vi.spyOn(IncomeEntry, 'findOne').mockResolvedValue(entry);
+    const findAll = vi.spyOn(IncomeEntry, 'findAll').mockResolvedValue([]);
+    vi.spyOn(MonthlyData, 'findOne').mockResolvedValue(null as any);
+
+    await handler(
+      {
+        params: { id: 'e1' },
+        body: {
+          date: '2026-08-02',
+          description: 'x',
+          category: 'cash',
+          amount: '1',
+          currency: 'USD',
+        },
+        userId: 'u1',
+      } as any,
+      mockRes(),
+    );
+
+    const prefixes = findAll.mock.calls.map(([options]) => {
+      const dateFilter = (options as any).where.date;
+      return dateFilter[Object.getOwnPropertySymbols(dateFilter)[0]];
+    });
+    expect(prefixes).toEqual(['2026-08', '2026-07']);
+  });
+});

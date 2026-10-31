@@ -41,6 +41,7 @@ beforeEach(() => {
   vi.spyOn(MonthlyData, 'destroy').mockResolvedValue(0);
   vi.spyOn(MonthlyData, 'findOne').mockResolvedValue(null as any);
   vi.spyOn(MonthlyData, 'create').mockResolvedValue({} as any);
+  vi.spyOn(MonthlyData, 'findOrCreateRow').mockResolvedValue([{ increment: vi.fn() }, true] as any);
 
   vi.spyOn(Account, 'destroy').mockResolvedValue(0);
   vi.spyOn(Account, 'bulkCreate').mockResolvedValue([] as any);
