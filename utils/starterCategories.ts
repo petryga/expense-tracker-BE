@@ -73,6 +73,18 @@ export const provisionStarterCategoriesForUser = async (userId: string | null) =
   );
 
   await sequelize.transaction(async (transaction) => {
+    // GET /categories checks "does this user own any?" and then calls us, so two
+    // overlapping first requests (two tabs, a retry) both see zero and would
+    // each create the full starter set. Serialize per user, then re-check: the
+    // loser waits for the winner's commit and finds the categories already there.
+    await sequelize.query('SELECT pg_advisory_xact_lock(hashtext(:key))', {
+      replacements: { key: `starter-categories:${userId ?? 'local'}` },
+      transaction,
+    });
+    if ((await Category.count({ where: { userId, isDefault: false }, transaction })) > 0) {
+      return;
+    }
+
     for (const { name, subcategories } of STARTER_TOP_LEVEL_CATEGORIES) {
       const parent = await Category.create(
         { name, parentCategoryId: null, isDefault: false, userId },

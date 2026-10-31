@@ -18,6 +18,8 @@ const SHARED_PARENTS = [
 
 beforeEach(() => {
   vi.spyOn(Category, 'findAll').mockResolvedValue(SHARED_PARENTS as any);
+  vi.spyOn(sequelize, 'query').mockResolvedValue([] as any);
+  vi.spyOn(Category, 'count').mockResolvedValue(0);
   vi.spyOn(sequelize, 'transaction').mockImplementation(((fn: any) => fn(FAKE_TRANSACTION)) as any);
   vi.spyOn(Category, 'create').mockImplementation(
     (data: any) => Promise.resolve({ id: `${data.name}-id`, ...data }) as any,
@@ -129,6 +131,45 @@ describe('provisionStarterCategoriesForUser', () => {
     expect(Category.create).toHaveBeenCalledWith(
       { name: 'Fees', parentCategoryId: null, isDefault: false, userId: null },
       { transaction: FAKE_TRANSACTION },
+    );
+  });
+
+  it('takes a per-user advisory lock before creating anything', async () => {
+    const order: string[] = [];
+    vi.spyOn(sequelize, 'query').mockImplementation((async (_sql: string, options: any) => {
+      order.push(`lock:${options.replacements.key}`);
+      return [];
+    }) as any);
+    vi.mocked(Category.create).mockImplementation((async (data: any) => {
+      order.push('create');
+      return { id: `id-${data.name}`, ...data };
+    }) as any);
+
+    await provisionStarterCategoriesForUser('u1');
+
+    expect(order[0]).toBe('lock:starter-categories:u1');
+    expect(order.filter((entry) => entry === 'create').length).toBeGreaterThan(0);
+  });
+
+  it('creates nothing when a concurrent request already provisioned this user', async () => {
+    vi.spyOn(Category, 'count').mockResolvedValue(3);
+
+    await provisionStarterCategoriesForUser('u1');
+
+    expect(Category.count).toHaveBeenCalledWith({
+      where: { userId: 'u1', isDefault: false },
+      transaction: FAKE_TRANSACTION,
+    });
+    expect(Category.create).not.toHaveBeenCalled();
+    expect(CategoryBudget.create).not.toHaveBeenCalled();
+  });
+
+  it('uses a separate lock key for the null-user local bucket', async () => {
+    await provisionStarterCategoriesForUser(null);
+
+    expect(sequelize.query).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ replacements: { key: 'starter-categories:local' } }),
     );
   });
 });
