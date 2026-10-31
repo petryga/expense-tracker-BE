@@ -109,4 +109,41 @@ describe('getMonthlyTotals', () => {
     await expect(getMonthlyTotals(null)).resolves.toEqual([]);
     expect((expenseFindAll.mock.calls[0][0] as any).where.userId).toBeNull();
   });
+
+  it('narrows both tables by category and currency', async () => {
+    const expenseFindAll = vi.spyOn(Expense, 'findAll').mockResolvedValue([] as any);
+    const incomeFindAll = vi.spyOn(IncomeEntry, 'findAll').mockResolvedValue([] as any);
+
+    await getMonthlyTotals('u1', { category: 'bankAccounts', currency: 'USD' as any });
+
+    for (const spy of [expenseFindAll, incomeFindAll]) {
+      expect((spy.mock.calls[0][0] as any).where).toEqual(
+        expect.objectContaining({ userId: 'u1', category: 'bankAccounts', currency: 'USD' }),
+      );
+    }
+  });
+
+  it('does not constrain category/currency when no filters are given', async () => {
+    const incomeFindAll = vi.spyOn(IncomeEntry, 'findAll').mockResolvedValue([] as any);
+    vi.spyOn(Expense, 'findAll').mockResolvedValue([] as any);
+
+    await getMonthlyTotals('u1');
+
+    const where = (incomeFindAll.mock.calls[0][0] as any).where;
+    expect(where).not.toHaveProperty('category');
+    expect(where).not.toHaveProperty('currency');
+  });
+
+  it('only queries the requested type', async () => {
+    const expenseFindAll = vi.spyOn(Expense, 'findAll').mockResolvedValue([] as any);
+    const incomeFindAll = vi.spyOn(IncomeEntry, 'findAll').mockResolvedValue([] as any);
+
+    await getMonthlyTotals('u1', { type: 'income' });
+    expect(expenseFindAll).not.toHaveBeenCalled();
+    expect(incomeFindAll).toHaveBeenCalledTimes(1);
+
+    await getMonthlyTotals('u1', { type: 'expense' });
+    expect(expenseFindAll).toHaveBeenCalledTimes(1);
+    expect(incomeFindAll).toHaveBeenCalledTimes(1);
+  });
 });

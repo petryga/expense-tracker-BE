@@ -6,113 +6,76 @@ import { handleError } from '../utils/common.js';
 
 const router = Router();
 
+const sumByCurrency = (expenses: Expense[]) => {
+  let cad = 0;
+  let usd = 0;
+  for (const expense of expenses) {
+    const amount = parseFloat(expense.amount);
+    if (expense.currency === Currency.CAD) cad += amount;
+    else if (expense.currency === Currency.USD) usd += amount;
+  }
+  return { cad: cad.toFixed(2), usd: usd.toFixed(2) };
+};
+
 router.get('/', async (req, res) => {
   const { search, yearMonth } = req.query as {
     search?: string;
     yearMonth?: string;
   };
   const userId = req.userId;
-  const expenses = await Expense.findAll({
-    where: { userId },
-    order: [['datePosted', 'DESC']],
-  });
 
-  if (yearMonth) {
-    const [year, month] = yearMonth.split('-');
-    const expenseData = expenses.filter((expense) => {
-      return expense.year === parseInt(year) && expense.month === parseInt(month);
-    });
+  try {
+    if (yearMonth) {
+      // Filtered in SQL so asking for one month only loads that month. A
+      // malformed value matches nothing (empty month), as it always has.
+      const match = /^(\d{4})-(\d{1,2})$/.exec(yearMonth);
+      const month = match ? Number(match[2]) : 0;
+      const expenses =
+        match && month >= 1 && month <= 12
+          ? await Expense.findAll({
+              where: { userId, year: Number(match[1]), month },
+              order: [['datePosted', 'DESC']],
+            })
+          : [];
 
-    const totalAmountCad = expenseData.reduce((acc, expense) => {
-      if (expense.currency === Currency.CAD) {
-        const amount = parseFloat(expense.amount);
-        return acc + amount;
-      }
-      return acc;
-    }, 0);
-
-    const totalAmountUsd = expenseData.reduce((acc, expense) => {
-      if (expense.currency === Currency.USD) {
-        const amount = parseFloat(expense.amount);
-        return acc + amount;
-      }
-      return acc;
-    }, 0);
-
-    const data = {
-      data: expenseData,
-      expensesTotal: {
-        totalAmountThisMonthCad: totalAmountCad.toFixed(2),
-        totalAmountThisMonthUsd: totalAmountUsd.toFixed(2),
-      },
-    };
-
-    res.json(data);
-    return;
-  }
-
-  if (search) {
-    Expense.findAll({
-      where: {
-        userId,
-        [Op.or]: [
-          {
-            description: {
-              [Op.iLike]: `%${search}%`,
-            },
-          },
-          {
-            category: {
-              [Op.iLike]: `%${search}%`,
-            },
-          },
-        ],
-      },
-    })
-      .then((expenses) => {
-        const totalAmountCad = expenses.reduce((acc, expense) => {
-          if (expense.currency === Currency.CAD) {
-            const amount = parseFloat(expense.amount);
-            return acc + amount;
-          }
-          return acc;
-        }, 0);
-
-        const totalAmountUsd = expenses.reduce((acc, expense) => {
-          if (expense.currency === Currency.USD) {
-            const amount = parseFloat(expense.amount);
-            return acc + amount;
-          }
-          return acc;
-        }, 0);
-
-        const data = {
-          data: expenses,
-          expensesTotal: {
-            totalAmountSearchResultsCad: totalAmountCad.toFixed(2),
-            totalAmountSearchResultsUsd: totalAmountUsd.toFixed(2),
-          },
-        };
-        res.json(data);
-      })
-      .catch((error) => {
-        console.error('Error fetching expenses:', error);
-        res.status(400).json({ error: 'Failed to fetch expenses' });
+      const { cad, usd } = sumByCurrency(expenses);
+      res.json({
+        data: expenses,
+        expensesTotal: { totalAmountThisMonthCad: cad, totalAmountThisMonthUsd: usd },
       });
-    return;
-  }
+      return;
+    }
 
-  const totalAmount = expenses.reduce((acc, expense) => {
-    const amount = parseFloat(expense.amount);
-    return acc + amount;
-  }, 0);
-  const data = {
-    data: expenses,
-    expensesTotal: {
-      totalAmountAllTime: totalAmount.toFixed(2),
-    },
-  };
-  res.json(data);
+    if (search) {
+      const expenses = await Expense.findAll({
+        where: {
+          userId,
+          [Op.or]: [
+            { description: { [Op.iLike]: `%${search}%` } },
+            { category: { [Op.iLike]: `%${search}%` } },
+          ],
+        },
+        order: [['datePosted', 'DESC']],
+      });
+
+      const { cad, usd } = sumByCurrency(expenses);
+      res.json({
+        data: expenses,
+        expensesTotal: { totalAmountSearchResultsCad: cad, totalAmountSearchResultsUsd: usd },
+      });
+      return;
+    }
+
+    // No grand total here: it used to add CAD and USD amounts together as if
+    // they were one currency, so the number meant nothing (and no page used it).
+    const expenses = await Expense.findAll({
+      where: { userId },
+      order: [['datePosted', 'DESC']],
+    });
+    res.json({ data: expenses, expensesTotal: {} });
+  } catch (error) {
+    handleError(res, error, 'Failed to fetch expenses');
+  }
 });
 
 router.post('/', async (req, res) => {

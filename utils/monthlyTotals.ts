@@ -56,26 +56,46 @@ export const buildMonthlyTotals = (rows: MonthlyTotalRow[]): MonthlyTotals[] => 
 // The expenses/income tables are the only source of truth: totals are summed
 // from them on every read instead of being kept in a second table that has to
 // be synced on each write (which is where all the drift bugs came from).
-export const getMonthlyTotals = async (userId: string | null): Promise<MonthlyTotals[]> => {
+export interface MonthlyTotalsFilters {
+  type?: MonthlyTotalsType;
+  category?: string;
+  currency?: Currency;
+}
+
+export const getMonthlyTotals = async (
+  userId: string | null,
+  { type, category, currency }: MonthlyTotalsFilters = {},
+): Promise<MonthlyTotals[]> => {
+  // category/currency narrow both tables the same way; `type` skips the
+  // table that wasn't asked for.
+  const narrow = {
+    ...(category ? { category } : {}),
+    ...(currency ? { currency } : {}),
+  };
+
   const [expenseRows, incomeRows] = await Promise.all([
-    Expense.findAll({
-      attributes: ['year', 'month', 'currency', [fn('SUM', col('amount')), 'total']],
-      where: { userId, year: { [Op.ne]: null }, month: { [Op.ne]: null } },
-      group: ['year', 'month', 'currency'],
-      raw: true,
-    }) as unknown as Promise<
-      { year: number; month: number; currency: string; total: string | null }[]
-    >,
-    IncomeEntry.findAll({
-      attributes: [
-        [fn('SUBSTRING', col('date'), 1, 7), 'yearMonth'],
-        'currency',
-        [fn('SUM', col('amount')), 'total'],
-      ],
-      where: { userId },
-      group: [fn('SUBSTRING', col('date'), 1, 7), 'currency'],
-      raw: true,
-    }) as unknown as Promise<{ yearMonth: string; currency: string; total: string | null }[]>,
+    type === 'income'
+      ? Promise.resolve([])
+      : (Expense.findAll({
+          attributes: ['year', 'month', 'currency', [fn('SUM', col('amount')), 'total']],
+          where: { userId, year: { [Op.ne]: null }, month: { [Op.ne]: null }, ...narrow },
+          group: ['year', 'month', 'currency'],
+          raw: true,
+        }) as unknown as Promise<
+          { year: number; month: number; currency: string; total: string | null }[]
+        >),
+    type === 'expense'
+      ? Promise.resolve([])
+      : (IncomeEntry.findAll({
+          attributes: [
+            [fn('SUBSTRING', col('date'), 1, 7), 'yearMonth'],
+            'currency',
+            [fn('SUM', col('amount')), 'total'],
+          ],
+          where: { userId, ...narrow },
+          group: [fn('SUBSTRING', col('date'), 1, 7), 'currency'],
+          raw: true,
+        }) as unknown as Promise<{ yearMonth: string; currency: string; total: string | null }[]>),
   ]);
 
   return buildMonthlyTotals([
