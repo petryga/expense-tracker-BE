@@ -12,7 +12,10 @@ import recurringIncomeEntries from './services/recurringIncomeEntries.js';
 import categories from './services/categories.js';
 import accounts from './services/accounts.js';
 import demo from './services/demo.js';
+import imports from './services/imports.js';
 import { requireAuth } from './middleware/auth.js';
+import { requestLogger } from './middleware/requestLogger.js';
+import { errorHandler } from './middleware/errorHandler.js';
 
 export const allowedOrigins = (
   process.env.FRONTEND_URL || 'http://localhost:5173,http://127.0.0.1:5173'
@@ -41,6 +44,8 @@ export const app = express();
 // single shared counter instead of one per client.
 app.set('trust proxy', 1);
 
+// First, so every request (even a CORS rejection) gets an id and a log line.
+app.use(requestLogger);
 app.use(helmet());
 app.use(
   cors({
@@ -61,6 +66,10 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   }
   next(err);
 });
+// Statement uploads arrive as CSV text inside JSON and can exceed the default
+// 100kb; only this route gets the larger limit. express.json skips a body that
+// is already parsed, so the global parser below leaves it alone.
+app.use('/imports', express.json({ limit: '2mb' }));
 app.use(express.json());
 
 // Express 5 leaves req.body as undefined when there was nothing to parse (no
@@ -94,3 +103,6 @@ app.use('/recurringIncome', recurringIncomeEntries);
 app.use('/categories', categories);
 app.use('/accounts', accounts);
 app.use('/demo', demo);
+app.use('/imports', imports);
+
+app.use(errorHandler);

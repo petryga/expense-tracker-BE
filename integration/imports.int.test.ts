@@ -1,0 +1,420 @@
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
+import request from 'supertest';
+import { Expense } from '../models/Expense.js';
+import { ImportBatch } from '../models/ImportBatch.js';
+import { ImportedTransaction } from '../models/ImportedTransaction.js';
+import { resetDemoUserData } from '../utils/demoData.js';
+import { pairingHooks } from '../utils/imports/pairing.js';
+import { buildApp, newUser, wipeAll } from './helpers.js';
+
+const app = buildApp();
+
+// Synthetic statements. Each row has a Reference, like the real extended export.
+const csv = (rows: [string, string, string, string][]) =>
+  ['Date,Description,Amount,Reference', ...rows.map((r) => r.map((c) => `"${c}"`).join(','))].join(
+    '\n',
+  );
+
+const SEPTEMBER = csv([
+  ['09/02/2026', 'WHOLE FOODS MKT AUSTIN TX', '82.10', "'1001"],
+  ['09/10/2026', 'AMAZON.COM*AB12C', '24.99', "'1002"],
+  ['09/12/2026', 'ZENNI OPTICAL INC NOVATO', '60.00', "'1003"],
+  ['09/20/2026', 'AUTOPAY PAYMENT - THANK YOU', '-500.00', "'1004"],
+  ['09/21/2026', 'YOUR CASH REWARD/REFUND IS', '-3.00', "'1005"],
+]);
+
+// Overlaps September by one row, and refunds the Amazon purchase in full and
+// the glasses only in part.
+const OCTOBER = csv([
+  ['09/12/2026', 'ZENNI OPTICAL INC NOVATO', '60.00', "'1003"],
+  ['10/03/2026', 'AMAZON MARKEPLACE NA PA', '-24.99', "'2001"],
+  ['10/04/2026', 'ZENNI OPTICAL INC NOVATO', '-20.00', "'2002"],
+  ['10/05/2026', 'STARBUCKS 0123 AUSTIN TX', '5.25', "'2003"],
+]);
+
+// No user = the null user of local no-auth mode.
+const as = (req: request.Test, user: string | null) => (user ? req.set('x-test-user', user) : req);
+
+const upload = (user: string | null, body: string, extra: Record<string, unknown> = {}) =>
+  as(request(app).post('/imports'), user).send({ fileName: 'activity.csv', csv: body, ...extra });
+
+const confirm = (user: string | null, batchId: string, rows: unknown[]) =>
+  as(request(app).post(`/imports/${batchId}/confirm`), user).send({ rows });
+
+type Row = {
+  id: string;
+  description: string;
+  status: string;
+  kind: string;
+  matched: { id: string } | null;
+};
+const byDesc = (rows: Row[], text: string, kind = 'charge') =>
+  rows.find((r) => r.description.includes(text) && r.kind === kind)!;
+
+beforeEach(async () => {
+  await wipeAll();
+  // Local mode by default; tests for production rules override these.
+  vi.stubEnv('AUTH_DISABLED', 'true');
+  vi.stubEnv('STATEMENT_UPLOAD_ENABLED', '');
+  vi.stubEnv('DEMO_USER_ID', '');
+});
+afterEach(() => vi.unstubAllEnvs());
+
+describe('statement import (real database)', () => {
+  it('imports drafts, skips payments and rewards, and reconciles to the file', async () => {
+    const user = newUser();
+    const res = await upload(user, SEPTEMBER);
+
+    expect(res.status).toBe(201);
+    expect(res.body.rows).toHaveLength(5);
+    expect(res.body.byStatus.draft.count).toBe(3);
+    expect(res.body.byStatus.skipped).toEqual({ count: 2, cents: -50300 });
+    expect(res.body.reconciliation).toMatchObject({
+      fileTotalCents: 16709 - 50300,
+      balanced: true,
+    });
+    expect(await Expense.count({ where: { userId: user } })).toBe(0); // nothing saved without review
+  });
+
+  it('does not duplicate rows when an overlapping file is uploaded again', async () => {
+    const user = newUser();
+    await upload(user, SEPTEMBER);
+    const again = await upload(user, SEPTEMBER);
+    expect(again.status).toBe(200);
+    expect(again.body).toEqual({ id: null, rowCount: 5, duplicateCount: 5 });
+    const list = await request(app).get('/imports').set('x-test-user', user);
+    expect(list.body.data).toHaveLength(1); // no empty import left behind
+
+    const october = await upload(user, OCTOBER);
+    expect(october.body.rows).toHaveLength(3);
+    expect(october.body.reconciliation).toMatchObject({
+      duplicateCount: 1,
+      duplicateTotalCents: 6000,
+      balanced: true,
+    });
+    expect(await ImportedTransaction.count({ where: { userId: user } })).toBe(8);
+  });
+
+  it('a refund cancels its draft purchase from an earlier month and upload: neither becomes an expense', async () => {
+    const user = newUser();
+    const sep = await upload(user, SEPTEMBER);
+    const oct = await upload(user, OCTOBER);
+
+    const refund = byDesc(oct.body.rows, 'AMAZON', 'refund');
+    expect(refund.status).toBe('returned');
+    const septemberNow = await request(app).get(`/imports/${sep.body.id}`).set('x-test-user', user);
+    const purchase = byDesc(septemberNow.body.rows, 'AMAZON');
+    expect(purchase.status).toBe('returned');
+    expect(purchase.matched!.id).toBe(refund.id);
+
+    // A partial refund is not paired; it waits for a decision.
+    expect(byDesc(oct.body.rows, 'ZENNI', 'refund')).toMatchObject({
+      status: 'draft',
+      matched: null,
+    });
+
+    // A returned purchase can't be saved.
+    const attempt = await confirm(user, sep.body.id, [
+      { id: purchase.id, action: 'save', category: 'Shopping' },
+    ]);
+    expect(attempt.status).toBe(400);
+  });
+
+  it('a refund for a purchase already saved removes that expense when you choose return', async () => {
+    const user = newUser();
+    const sep = await upload(user, SEPTEMBER);
+    const amazon = byDesc(sep.body.rows, 'AMAZON');
+    const groceries = byDesc(sep.body.rows, 'WHOLE FOODS');
+    const saved = await confirm(user, sep.body.id, [
+      { id: amazon.id, action: 'save', category: 'Shopping' },
+      { id: groceries.id, action: 'save', category: 'Groceries', description: 'groceries' },
+    ]);
+    expect(saved.body).toMatchObject({ saved: 2 });
+    expect(await Expense.count({ where: { userId: user } })).toBe(2);
+
+    const oct = await upload(user, OCTOBER);
+    const refund = byDesc(oct.body.rows, 'AMAZON', 'refund');
+    expect(refund.status).toBe('draft');
+    expect(refund.matched).toMatchObject({ status: 'saved' });
+
+    const returned = await confirm(user, oct.body.id, [{ id: refund.id, action: 'return' }]);
+    expect(returned.status).toBe(200);
+    const left = await Expense.findAll({ where: { userId: user } });
+    expect(left.map((e) => [e.description, String(e.amount)])).toEqual([['groceries', '82.1']]);
+  });
+
+  it('saves confirmed charges as expenses with the right amount, date, account and currency', async () => {
+    const user = newUser();
+    const res = await upload(user, SEPTEMBER, { account: 'Amex', currency: 'CAD' });
+    const drafts = (res.body.rows as Row[]).filter((r) => r.status === 'draft');
+    const body = await confirm(
+      user,
+      res.body.id,
+      drafts.map((r) => ({ id: r.id, action: 'save', category: 'Misc' })),
+    );
+    expect(body.status).toBe(200);
+    expect(body.body.import.draftCount).toBe(0);
+
+    const expenses = await Expense.findAll({
+      where: { userId: user },
+      order: [['datePosted', 'ASC']],
+    });
+    expect(
+      expenses.map((e) => [e.datePosted, Number(e.amount), e.year, e.month, e.account, e.currency]),
+    ).toEqual([
+      ['2026-09-02', 82.1, 2026, 9, 'Amex', 'CAD'],
+      ['2026-09-10', 24.99, 2026, 9, 'Amex', 'CAD'],
+      ['2026-09-12', 60, 2026, 9, 'Amex', 'CAD'],
+    ]);
+    // Saved expense total equals the saved statement rows, to the cent.
+    const savedCents = (body.body.import.byStatus.saved.cents as number) / 100;
+    expect(expenses.reduce((s, e) => s + Number(e.amount), 0)).toBeCloseTo(savedCents, 2);
+
+    const twice = await confirm(user, res.body.id, [{ id: drafts[0].id, action: 'skip' }]);
+    expect(twice.status).toBe(400);
+  });
+
+  it('keeps users apart: no cross-user dedupe, pairing or access', async () => {
+    const alice = newUser();
+    const bob = newUser();
+    const a = await upload(alice, SEPTEMBER);
+    const b = await upload(bob, OCTOBER);
+
+    expect(b.body.rows).toHaveLength(4); // the overlapping row is new for Bob
+    expect(byDesc(b.body.rows, 'AMAZON', 'refund').status).toBe('draft'); // not paired with Alice's purchase
+    expect((await request(app).get(`/imports/${a.body.id}`).set('x-test-user', bob)).status).toBe(
+      404,
+    );
+    expect(
+      (await confirm(bob, a.body.id, [{ id: a.body.rows[0].id, action: 'skip' }])).status,
+    ).toBe(404);
+  });
+
+  it('pairs the same purchase only once when two uploads race', async () => {
+    const user = newUser();
+    await upload(user, SEPTEMBER);
+    // Two files, each with its own refund for the one purchase, uploaded at once.
+    // Each upload waits at the pairing step until the other one gets there too
+    // (or 1 s passes). Without the per-user lock both arrive, both read the
+    // purchase as unpaired, and both claim it. With the lock the second can't
+    // reach that step until the first has finished, so the first waits out the
+    // 1 s, pairs, commits, and the second then finds the purchase already taken.
+    let arrived = 0;
+    let releaseAll = () => {};
+    const bothThere = new Promise<void>((resolve) => (releaseAll = resolve));
+    const original = pairingHooks.beforePairing;
+    pairingHooks.beforePairing = async () => {
+      arrived += 1;
+      if (arrived >= 2) releaseAll();
+      await Promise.race([bothThere, new Promise((resolve) => setTimeout(resolve, 1000))]);
+    };
+    onTestFinished(() => {
+      pairingHooks.beforePairing = original;
+    });
+    const sameRefundTwoFiles = [
+      csv([['10/03/2026', 'AMAZON MARKEPLACE NA PA', '-24.99', "'3001"]]),
+      csv([['10/04/2026', 'AMAZON MARKEPLACE NA PA', '-24.99', "'3002"]]),
+    ];
+    const results = await Promise.all(sameRefundTwoFiles.map((body) => upload(user, body)));
+    results.forEach((r) => expect(r.status).toBe(201));
+    expect(
+      await ImportedTransaction.count({
+        where: { userId: user, kind: 'refund', status: 'returned' },
+      }),
+    ).toBe(1);
+  });
+
+  it('rejects a malformed file with line numbers', async () => {
+    const res = await upload(
+      newUser(),
+      "Date,Description,Amount,Reference\n99/99/2026,X,1.00,'9\n",
+    );
+    expect(res.status).toBe(400);
+    expect(res.body.details).toEqual([
+      { line: 2, message: 'Invalid date "99/99/2026" (expected MM/DD/YYYY)' },
+    ]);
+  });
+
+  it('deleting an import releases the purchases it had paired', async () => {
+    const user = newUser();
+    const sep = await upload(user, SEPTEMBER);
+    const oct = await upload(user, OCTOBER);
+    const deleted = await request(app).delete(`/imports/${oct.body.id}`).set('x-test-user', user);
+    expect(deleted.status).toBe(200);
+    expect(deleted.body).toEqual({ deletedExpenses: 0 });
+    const septemberNow = await request(app).get(`/imports/${sep.body.id}`).set('x-test-user', user);
+    expect(byDesc(septemberNow.body.rows, 'AMAZON')).toMatchObject({
+      status: 'draft',
+      matched: null,
+    });
+  });
+
+  it('deleting an import also deletes the expenses it saved that still exist', async () => {
+    const user = newUser();
+    const other = newUser();
+    const sep = await upload(user, SEPTEMBER);
+    await upload(other, SEPTEMBER);
+    const [groceries, amazon, zenni] = ['WHOLE FOODS', 'AMAZON', 'ZENNI'].map((t) =>
+      byDesc(sep.body.rows, t),
+    );
+    await confirm(user, sep.body.id, [
+      { id: groceries.id, action: 'save', category: 'Groceries' },
+      { id: amazon.id, action: 'save', category: 'Shopping' },
+      { id: zenni.id, action: 'skip' },
+    ]);
+    // One of the two saved expenses was already deleted on the Expenses page.
+    const saved = await Expense.findAll({ where: { userId: user } });
+    await saved[0].destroy();
+    const before = await request(app).get(`/imports/${sep.body.id}`).set('x-test-user', user);
+    expect(before.body.savedExpenseCount).toBe(1);
+
+    const deleted = await request(app).delete(`/imports/${sep.body.id}`).set('x-test-user', user);
+    expect(deleted.body).toEqual({ deletedExpenses: 1 });
+    expect(await Expense.count({ where: { userId: user } })).toBe(0);
+    expect(await ImportBatch.count({ where: { userId: user } })).toBe(0);
+    expect(await ImportedTransaction.count({ where: { userId: user } })).toBe(0);
+    expect(await ImportedTransaction.count({ where: { userId: other } })).toBe(5);
+
+    // The same file can be imported again afterwards.
+    expect((await upload(user, SEPTEMBER)).status).toBe(201);
+  });
+
+  it('puts skipped rows back into review, and only skipped rows', async () => {
+    const user = newUser();
+    const sep = await upload(user, SEPTEMBER);
+    const [groceries, zenni] = ['WHOLE FOODS', 'ZENNI'].map((t) => byDesc(sep.body.rows, t));
+    const payment = byDesc(sep.body.rows, 'AUTOPAY', 'payment');
+    await confirm(user, sep.body.id, [
+      { id: groceries.id, action: 'save', category: 'Groceries' },
+      { id: zenni.id, action: 'skip' },
+    ]);
+    const reopen = (rowIds: string[], who: string = user) =>
+      as(request(app).post(`/imports/${sep.body.id}/reopen`), who).send({ rowIds });
+
+    const res = await reopen([zenni.id, payment.id]);
+    expect(res.status).toBe(200);
+    expect(res.body.reopened).toBe(2);
+    expect(byDesc(res.body.import.rows, 'ZENNI').status).toBe('draft');
+    expect(byDesc(res.body.import.rows, 'AUTOPAY', 'payment').status).toBe('draft');
+
+    // A saved row can't be reopened this way, and nothing changes.
+    expect((await reopen([groceries.id])).status).toBe(400);
+    expect((await reopen([zenni.id], newUser())).status).toBe(404);
+
+    // Back in review, it can be saved like any draft.
+    const saved = await confirm(user, sep.body.id, [
+      { id: zenni.id, action: 'save', category: 'Health' },
+    ]);
+    expect(saved.body.saved).toBe(1);
+  });
+
+  it('a reopened purchase whose full refund is already imported comes back as returned', async () => {
+    const user = newUser();
+    const sep = await upload(user, SEPTEMBER);
+    const amazon = byDesc(sep.body.rows, 'AMAZON');
+    await confirm(user, sep.body.id, [{ id: amazon.id, action: 'save', category: 'Shopping' }]);
+    const oct = await upload(user, OCTOBER);
+    const refund = byDesc(oct.body.rows, 'AMAZON', 'refund');
+    // Keep the purchase, skip the refund: the pair is broken.
+    await confirm(user, oct.body.id, [{ id: refund.id, action: 'skip' }]);
+
+    // Reopening the refund pairs it with the saved purchase again.
+    const res = await as(request(app).post(`/imports/${oct.body.id}/reopen`), user).send({
+      rowIds: [refund.id],
+    });
+    expect(byDesc(res.body.import.rows, 'AMAZON', 'refund')).toMatchObject({
+      status: 'draft',
+      matched: { status: 'saved' },
+    });
+  });
+
+  it('can delete an import and keep the expenses it saved', async () => {
+    const user = newUser();
+    const sep = await upload(user, SEPTEMBER);
+    const groceries = byDesc(sep.body.rows, 'WHOLE FOODS');
+    await confirm(user, sep.body.id, [{ id: groceries.id, action: 'save', category: 'Groceries' }]);
+
+    const deleted = await request(app)
+      .delete(`/imports/${sep.body.id}?keepExpenses=true`)
+      .set('x-test-user', user);
+    expect(deleted.body).toEqual({ deletedExpenses: 0 });
+    expect(await Expense.count({ where: { userId: user } })).toBe(1);
+    expect(await ImportBatch.count({ where: { userId: user } })).toBe(0);
+  });
+
+  it("cannot delete another user's import", async () => {
+    const owner = newUser();
+    const sep = await upload(owner, SEPTEMBER);
+    const res = await request(app).delete(`/imports/${sep.body.id}`).set('x-test-user', newUser());
+    expect(res.status).toBe(404);
+    expect(await ImportBatch.count({ where: { userId: owner } })).toBe(1);
+  });
+
+  it('works end to end for the null user of local no-auth mode', async () => {
+    const sep = await upload(null, SEPTEMBER);
+    expect(sep.status).toBe(201);
+    const again = await upload(null, SEPTEMBER);
+    expect(again.body).toEqual({ id: null, rowCount: 5, duplicateCount: 5 });
+
+    const oct = await upload(null, OCTOBER);
+    expect(byDesc(oct.body.rows, 'AMAZON', 'refund').status).toBe('returned');
+
+    const groceries = byDesc(sep.body.rows, 'WHOLE FOODS');
+    const saved = await confirm(null, sep.body.id, [
+      { id: groceries.id, action: 'save', category: 'Groceries' },
+    ]);
+    expect(saved.status).toBe(200);
+    expect(await Expense.count({ where: { userId: null } })).toBe(1);
+
+    // A real user sees none of it.
+    const someone = newUser();
+    expect((await as(request(app).get('/imports'), someone)).body.data).toEqual([]);
+    expect((await as(request(app).get(`/imports/${sep.body.id}`), someone)).status).toBe(404);
+  });
+});
+
+describe('statement import in production (demo and feature flag)', () => {
+  const demo = newUser();
+  beforeEach(() => {
+    vi.stubEnv('AUTH_DISABLED', '');
+    vi.stubEnv('DEMO_USER_ID', demo);
+  });
+
+  it('never lets the demo user upload a file, and offers the sample instead', async () => {
+    expect((await upload(demo, SEPTEMBER)).status).toBe(403);
+    const list = await as(request(app).get('/imports'), demo);
+    expect(list.body).toMatchObject({ uploadAllowed: false, sampleAvailable: true });
+
+    const sample = await as(request(app).post('/imports/sample'), demo);
+    expect(sample.status).toBe(201);
+    expect(sample.body.reconciliation.balanced).toBe(true);
+    const statuses = (sample.body.rows as Row[]).map((r) => `${r.kind}:${r.status}`);
+    expect(statuses.filter((s) => s === 'charge:returned')).toHaveLength(1);
+    expect(statuses.filter((s) => s === 'refund:draft')).toHaveLength(1); // the partial refund
+    expect(statuses).toContain('payment:skipped');
+    expect(statuses).toContain('reward:skipped');
+  });
+
+  it('keeps upload off for other accounts unless the feature flag is on', async () => {
+    const someone = newUser();
+    expect((await upload(someone, SEPTEMBER)).status).toBe(403);
+    expect((await as(request(app).post('/imports/sample'), someone)).status).toBe(403);
+    vi.stubEnv('STATEMENT_UPLOAD_ENABLED', 'true');
+    expect((await upload(someone, SEPTEMBER)).status).toBe(201);
+  });
+
+  it('demo reset wipes the demo imports and leaves everyone else alone', async () => {
+    await as(request(app).post('/imports/sample'), demo);
+    vi.stubEnv('STATEMENT_UPLOAD_ENABLED', 'true');
+    const other = newUser();
+    await upload(other, SEPTEMBER);
+
+    await resetDemoUserData(demo);
+
+    expect(await ImportBatch.count({ where: { userId: demo } })).toBe(0);
+    expect(await ImportedTransaction.count({ where: { userId: demo } })).toBe(0);
+    expect(await ImportedTransaction.count({ where: { userId: other } })).toBe(5);
+    // And the sample can be loaded again right after.
+    expect((await as(request(app).post('/imports/sample'), demo)).status).toBe(201);
+  });
+});

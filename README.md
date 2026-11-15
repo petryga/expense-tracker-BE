@@ -84,6 +84,23 @@ To enable auth, set `SUPABASE_URL` (and drop `AUTH_DISABLED`); the frontend must
 | `npm test` | Vitest |
 | `npm run lint` / `npm run typecheck` | both fail on any warning |
 
+## Statement import
+
+Upload an Amex activity CSV (the detailed export, which has a unique `Reference` per row), review the rows, confirm. Nothing becomes an expense without a confirm.
+
+- `POST /imports` `{ fileName, csv, account, currency }` parses the file and stores every row in `imported_transactions`. Rows already imported (same `Reference`) are counted as duplicates, not stored again.
+- Rules, not a model, decide what isn't spending: card payments and reward credits are skipped. A refund that equals an earlier purchase from the same merchant (within 180 days, any month, any upload) cancels it: both are marked `returned` and neither becomes an expense. If that purchase was already saved, the refund waits on review, and confirming `return` removes the expense. Partial refunds aren't paired; you decide them.
+- Every import reconciles: imported rows plus duplicates add up to the file total, to the cent.
+- `GET /imports`, `GET /imports/:id`, `POST /imports/:id/confirm` `{ rows: [{ id, action: save|skip|return, category?, description? }] }`, `DELETE /imports/:id` (only while nothing is saved).
+- The demo account can't upload; `POST /imports/sample` loads a synthetic statement bundled in `utils/sampleStatement.ts`. Demo reset wipes its imports.
+
+## Logging
+
+- One JSON line per request (pino-http): request id, method, path (no query string), status, duration, `userId`. Level from `LOG_LEVEL`; `LOG_PRETTY=true` for readable local output.
+- **Request ids:** every response has an `X-Request-Id`. A well-formed incoming one (`[A-Za-z0-9._-]`, up to 64 chars) is kept, so a proxy or another service can pass its own. To trace a request, search the logs for that id: the request line and any error logged while handling it carry it.
+- **Errors:** a central error middleware logs the error with its stack and the request id, and returns `{ error, requestId }`, never a stack trace. `handleError` (route-level 500s) does the same.
+- **Never logged:** headers (so no tokens or cookies), request or response bodies, query strings (search text is expense descriptions), statement descriptions or amounts.
+
 ## Configuration
 
 See `.env.example` for the full list. Key vars: `DB_*`, `SUPABASE_URL`, `AUTH_DISABLED`, `FRONTEND_URL` (CORS allowlist), `DEMO_USER_ID`.

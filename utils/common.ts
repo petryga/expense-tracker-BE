@@ -1,4 +1,5 @@
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
+import { logger } from './logger.js';
 import { InvalidDateError } from './dates.js';
 
 // Logs an unexpected failure and returns a generic 500. Only ever called from
@@ -11,6 +12,9 @@ export const handleError = (res: Response, error: unknown, message: string) => {
     return res.status(400).json({ error: error.message });
   }
 
-  console.error(message, error);
-  res.status(500).json({ error: message });
+  // res.req is the request this response belongs to; its child logger already
+  // carries the request id. Fall back to the root logger for bare test doubles.
+  const req = res.req as Request | undefined;
+  (req?.log ?? logger).error({ err: error }, message);
+  res.status(500).json(req?.id ? { error: message, requestId: req.id } : { error: message });
 };

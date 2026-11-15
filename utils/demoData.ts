@@ -6,6 +6,8 @@ import { RecurringIncomeEntry } from '../models/RecurringIncomeEntry.js';
 import { Account } from '../models/Account.js';
 import { Category } from '../models/Category.js';
 import { CategoryBudget } from '../models/CategoryBudget.js';
+import { ImportBatch } from '../models/ImportBatch.js';
+import { ImportedTransaction } from '../models/ImportedTransaction.js';
 import { createExpenseObject } from './expensesUtils.js';
 import { createIncomeEntryObject } from './incomeEntriesUtils.js';
 
@@ -103,6 +105,9 @@ export const resetDemoUserData = async (userId: string) => {
     await RecurringExpense.destroy({ where: { userId }, transaction });
     await RecurringIncomeEntry.destroy({ where: { userId }, transaction });
     await Account.destroy({ where: { userId }, transaction });
+    // Sample statement imports: drafts, pairs and the batches themselves.
+    await ImportedTransaction.destroy({ where: { userId }, transaction });
+    await ImportBatch.destroy({ where: { userId }, transaction });
     // Not reseeded here - wiping these personal (isDefault:false) rows
     // just drops the user's owned-category count back to 0, so the next
     // GET /categories call provisions a fresh starter set automatically

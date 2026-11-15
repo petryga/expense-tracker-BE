@@ -5,6 +5,7 @@ import incomeRouter from '../services/incomeEntries.js';
 import monthlyData from '../services/monthlyData.js';
 import reports from '../services/reports.js';
 import categories from '../services/categories.js';
+import imports from '../services/imports.js';
 import { sequelize } from '../config/database.js';
 
 // The real routers on a real database, minus auth/CORS/rate limiting. A request
@@ -23,6 +24,7 @@ export const buildApp = (): Express => {
   app.use('/monthlyData', monthlyData);
   app.use('/reports', reports);
   app.use('/categories', categories);
+  app.use('/imports', imports);
   return app;
 };
 
@@ -50,7 +52,7 @@ export const incomeBody = (overrides: Record<string, unknown> = {}) => ({
 
 export const wipeAll = async () => {
   await sequelize.query(
-    'TRUNCATE expenses, income_entries, categories, category_budgets, accounts RESTART IDENTITY',
+    'TRUNCATE expenses, income_entries, categories, category_budgets, accounts, import_batches, imported_transactions RESTART IDENTITY',
   );
 };
 
