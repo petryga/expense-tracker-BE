@@ -8,6 +8,7 @@ import { deleteImport } from '../utils/imports/delete.js';
 import { ImportInputError, ImportNotFoundError } from '../utils/imports/errors.js';
 import { getImport, listImports } from '../utils/imports/read.js';
 import { reopenRows } from '../utils/imports/reopen.js';
+import { suggestForImport } from '../utils/imports/suggest.js';
 import { uploadStatement } from '../utils/imports/upload.js';
 
 // Statement import (PLANS.md, Plan 3 Phase A): upload an Amex CSV, review the
@@ -88,6 +89,8 @@ router.post('/', async (req, res) => {
       currency,
     });
     if (!id) return res.status(200).json({ id: null, rowCount, duplicateCount: rowCount });
+    // Never fails the import: without suggestions the rows are simply blank.
+    await suggestForImport(req.userId, id, req.id as string);
     res.status(201).json(await getImport(req.userId, id));
   } catch (error) {
     fail(res, error, 'Failed to import statement');

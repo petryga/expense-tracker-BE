@@ -94,6 +94,10 @@ Upload an Amex activity CSV (the detailed export, which has a unique `Reference`
 - `GET /imports`, `GET /imports/:id`, `POST /imports/:id/confirm` `{ rows: [{ id, action: save|skip|return, category?, description? }] }`, `DELETE /imports/:id` (only while nothing is saved).
 - The demo account can't upload; `POST /imports/sample` loads a synthetic statement bundled in `utils/sampleStatement.ts`. Demo reset wipes its imports.
 
+### AI category suggestions
+
+With `AI_CATEGORIZE_ENABLED=true` (plus `AI_SERVICE_URL` and `AI_SHARED_SECRET`), an upload asks the separate AI service ([`AI/`](../AI)) to suggest a category for each new draft purchase, after the import has been saved. The client (`utils/imports/aiClient.ts`) treats the service like any third party: a short timeout (`AI_TIMEOUT_MS`, default 8 s), the response shape is checked, and only categories the user actually has are kept. Any failure (down, slow, HTTP error, malformed answer) means the rows import with no suggestion; the upload never fails because of it. The request id is passed on in `X-Request-Id`, so one import can be traced in both services' logs. Off for the demo user.
+
 ## Logging
 
 - One JSON line per request (pino-http): request id, method, path (no query string), status, duration, `userId`. Level from `LOG_LEVEL`; `LOG_PRETTY=true` for readable local output.

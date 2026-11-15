@@ -100,6 +100,8 @@ export const getImport = async (userId: string | null, batchId: string) => {
         kind: row.kind,
         status: row.status,
         category: row.category,
+        suggestedCategory: row.suggestedCategory ?? null,
+        suggestionSource: row.suggestionSource ?? null,
         expenseId: row.expenseId,
         amexCategory: row.raw.Category || null,
         matched: match

@@ -21,6 +21,8 @@ export class ImportedTransaction extends Model {
   declare category: string | null;
   declare expenseId: string | null;
   declare matchedTransactionId: string | null;
+  declare suggestedCategory: string | null;
+  declare suggestionSource: string | null;
 }
 
 ImportedTransaction.init(
@@ -46,6 +48,8 @@ ImportedTransaction.init(
     category: { type: DataTypes.STRING, allowNull: true },
     expenseId: { type: DataTypes.UUID, allowNull: true },
     matchedTransactionId: { type: DataTypes.UUID, allowNull: true },
+    suggestedCategory: { type: DataTypes.STRING, allowNull: true },
+    suggestionSource: { type: DataTypes.STRING, allowNull: true },
     createdAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
     updatedAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
   },

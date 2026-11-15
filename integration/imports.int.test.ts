@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import request from 'supertest';
+import { Category } from '../models/Category.js';
 import { Expense } from '../models/Expense.js';
 import { ImportBatch } from '../models/ImportBatch.js';
 import { ImportedTransaction } from '../models/ImportedTransaction.js';
@@ -370,6 +371,115 @@ describe('statement import (real database)', () => {
     const someone = newUser();
     expect((await as(request(app).get('/imports'), someone)).body.data).toEqual([]);
     expect((await as(request(app).get(`/imports/${sep.body.id}`), someone)).status).toBe(404);
+  });
+});
+
+describe('AI category suggestions on upload', () => {
+  // The AI service is faked at the network: BE's real client, validation and
+  // storage run, against a real database.
+  const giveCategories = async (userId: string) => {
+    const food = await Category.create({ name: 'Food', userId, isDefault: false });
+    await Category.create({
+      name: 'Groceries',
+      userId,
+      parentCategoryId: food.id,
+      isDefault: false,
+    });
+  };
+  const aiAnswers = (category: string) =>
+    vi.fn(async (_url: string, init: RequestInit) => {
+      const { rows } = JSON.parse(init.body as string) as { rows: { id: string; text: string }[] };
+      return new Response(
+        JSON.stringify({
+          suggestions: rows.map((r) => ({
+            id: r.id,
+            category: r.text.includes('WHOLE FOODS') ? category : null,
+            source: r.text.includes('WHOLE FOODS') ? 'model' : 'none',
+          })),
+        }),
+      );
+    });
+
+  beforeEach(() => {
+    vi.stubEnv('AI_CATEGORIZE_ENABLED', 'true');
+    vi.stubEnv('AI_SERVICE_URL', 'http://ai.test');
+    vi.stubEnv('AI_SHARED_SECRET', 'test');
+    vi.stubEnv('AI_TIMEOUT_MS', '200');
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("stores a suggestion for draft purchases, only ever one of the user's categories", async () => {
+    const user = newUser();
+    await giveCategories(user);
+    const fetchMock = aiAnswers('Groceries');
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await upload(user, SEPTEMBER);
+    expect(res.status).toBe(201);
+    expect(byDesc(res.body.rows, 'WHOLE FOODS')).toMatchObject({
+      suggestedCategory: 'Groceries',
+      suggestionSource: 'model',
+    });
+    expect(byDesc(res.body.rows, 'ZENNI')).toMatchObject({ suggestedCategory: null });
+    // Only draft purchases are sent: not the payment or the reward.
+    const sent = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    expect(sent.rows).toHaveLength(3);
+    expect(sent.categories).toEqual(['Groceries']);
+  });
+
+  it('ignores a suggested category the user does not have', async () => {
+    const user = newUser();
+    await giveCategories(user);
+    vi.stubGlobal('fetch', aiAnswers('Yachts'));
+    const res = await upload(user, SEPTEMBER);
+    expect(byDesc(res.body.rows, 'WHOLE FOODS').suggestedCategory).toBeNull();
+  });
+
+  it('imports normally when the AI service is down or slow', async () => {
+    const user = newUser();
+    await giveCategories(user);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Promise.reject(new TypeError('fetch failed'))),
+    );
+    const down = await upload(user, SEPTEMBER);
+    expect(down.status).toBe(201);
+    expect(
+      down.body.rows.every((r: { suggestedCategory: unknown }) => r.suggestedCategory === null),
+    ).toBe(true);
+
+    const other = newUser();
+    await giveCategories(other);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_url: string, init: RequestInit) =>
+          new Promise((_resolve, reject) =>
+            init.signal?.addEventListener('abort', () => reject(init.signal?.reason)),
+          ),
+      ),
+    );
+    const slow = await upload(other, SEPTEMBER);
+    expect(slow.status).toBe(201);
+    expect(slow.body.reconciliation.balanced).toBe(true);
+  });
+
+  it('does not call the AI service when the feature is off, or for the demo user', async () => {
+    const fetchMock = aiAnswers('Groceries');
+    vi.stubGlobal('fetch', fetchMock);
+    const user = newUser();
+    await giveCategories(user);
+
+    vi.stubEnv('AI_CATEGORIZE_ENABLED', 'false');
+    await upload(user, SEPTEMBER);
+
+    vi.stubEnv('AI_CATEGORIZE_ENABLED', 'true');
+    vi.stubEnv('AUTH_DISABLED', '');
+    vi.stubEnv('STATEMENT_UPLOAD_ENABLED', 'true');
+    vi.stubEnv('DEMO_USER_ID', user);
+    await as(request(app).post('/imports/sample'), user);
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
