@@ -26,6 +26,7 @@ router.get('/', async (req, res) => {
         { id: 'amount', title: 'Amount' },
         { id: 'currency', title: 'Currency' },
         { id: 'account', title: 'Account' },
+        { id: 'gift', title: 'Gift' },
       ],
     });
 
@@ -37,6 +38,7 @@ router.get('/', async (req, res) => {
       amount: expense.amount || 0,
       currency: expense.currency || Currency.CAD,
       account: expense.account || 'Default Account',
+      gift: expense.isGift ? 'yes' : '',
     }));
 
     await csvWriter.writeRecords(formattedExpenses);

@@ -6,6 +6,12 @@ import { handleError } from '../utils/common.js';
 
 const router = Router();
 
+// "gift", "Gifts", "gif"…: a search that could mean gifts also lists them.
+export const matchesGifts = (search: string) => {
+  const term = search.trim().toLowerCase();
+  return term.length >= 3 && 'gifts'.startsWith(term.replace(/s$/, ''));
+};
+
 const sumByCurrency = (expenses: Expense[]) => {
   let cad = 0;
   let usd = 0;
@@ -53,6 +59,8 @@ router.get('/', async (req, res) => {
           [Op.or]: [
             { description: { [Op.iLike]: `%${search}%` } },
             { category: { [Op.iLike]: `%${search}%` } },
+            // Gifts are a flag, not a category: searching "gift" finds them too.
+            ...(matchesGifts(search) ? [{ isGift: true }] : []),
           ],
         },
         order: [['datePosted', 'DESC']],

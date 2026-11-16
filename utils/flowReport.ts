@@ -2,6 +2,7 @@ import { col, fn, Op } from 'sequelize';
 import { Currency, Expense } from '../models/Expense.js';
 import { IncomeEntry } from '../models/IncomeEntry.js';
 import { convertAmount } from './fx.js';
+import { reportCategory } from './gifts.js';
 
 // Only these count toward the "income" balance that the savings swing is
 // measured on; crypto is deliberately left out.
@@ -139,15 +140,23 @@ export const getFlowReport = async (
       { yearMonth: string; category: string; currency: string; total: string | null }[]
     >,
     Expense.findAll({
-      attributes: ['year', 'month', 'category', 'currency', [fn('SUM', col('amount')), 'total']],
+      attributes: [
+        'year',
+        'month',
+        'category',
+        'isGift',
+        'currency',
+        [fn('SUM', col('amount')), 'total'],
+      ],
       where: { userId, amount: { [Op.gt]: 0 }, year: { [Op.ne]: null }, month: { [Op.ne]: null } },
-      group: ['year', 'month', 'category', 'currency'],
+      group: ['year', 'month', 'category', 'isGift', 'currency'],
       raw: true,
     }) as unknown as Promise<
       {
         year: number;
         month: number;
         category: string | null;
+        isGift: boolean;
         currency: string;
         total: string | null;
       }[]
@@ -160,7 +169,7 @@ export const getFlowReport = async (
       .map((row) => ({ ...row, total: parseFloat(row.total ?? '0') || 0 })),
     expenseRows: expenses.map((row) => ({
       yearMonth: `${row.year}-${String(row.month).padStart(2, '0')}`,
-      category: row.category?.trim() || 'Uncategorized',
+      category: reportCategory(row.category, row.isGift),
       currency: row.currency,
       total: parseFloat(row.total ?? '0') || 0,
     })),

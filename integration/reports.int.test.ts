@@ -110,6 +110,49 @@ describe('GET /reports/months and /reports/monthly', () => {
     ]);
   });
 
+  it('gives gifts their own slice in the monthly breakdown', async () => {
+    const api = as(newUser());
+    await api.post('/expenses', [
+      expenseBody({
+        datePosted: '2026-03-02',
+        category: 'Clothing',
+        amount: '40',
+        description: 'jeans',
+      }),
+      expenseBody({
+        datePosted: '2026-03-03',
+        category: 'Clothing',
+        amount: '25',
+        description: 'scarf',
+        isGift: true,
+      }),
+    ]);
+    const march = await api.get('/reports/monthly?yearMonth=2026-03');
+    expect(march.body.dataByCategory.map((c: any) => [c.category, c.total])).toEqual([
+      ['Clothing', 40],
+      ['Gifts', 25],
+    ]);
+    // The expense itself keeps its real category.
+    const saved = await api.get('/expenses?yearMonth=2026-03');
+    expect(saved.body.data.find((e: any) => e.description === 'scarf')).toMatchObject({
+      category: 'Clothing',
+      isGift: true,
+    });
+  });
+
+  it('finds gifts when searching for "gift", whatever their category', async () => {
+    const api = as(newUser());
+    await api.post('/expenses', [
+      expenseBody({ category: 'Clothing', description: 'scarf', isGift: true }),
+      expenseBody({ category: 'Clothing', description: 'jeans' }),
+    ]);
+    for (const term of ['gift', 'Gifts', 'gif']) {
+      const res = await api.get(`/expenses?search=${term}`);
+      expect(res.body.data.map((e: any) => e.description)).toEqual(['scarf']);
+    }
+    expect((await api.get('/expenses?search=gi')).body.data).toEqual([]);
+  });
+
   it('returns an empty report for a month with no expenses', async () => {
     const api = as(newUser());
     const response = await api.get('/reports/monthly?yearMonth=2030-01');
@@ -179,6 +222,23 @@ describe('GET /reports/flow', () => {
         { category: 'Groceries', value: 74 },
       ],
     });
+  });
+
+  it('shows gifts as their own flow, apart from their real categories', async () => {
+    const api = as(newUser());
+    await seed(api);
+    await api.post('/expenses', [
+      expenseBody({ datePosted: '2026-03-17', category: 'Rent', amount: '50', isGift: true }),
+      expenseBody({ datePosted: '2026-03-18', category: 'Clothing', amount: '30', isGift: true }),
+    ]);
+
+    const response = await api.get('/reports/flow');
+
+    expect(response.body.categories).toEqual([
+      { category: 'Rent', value: 500 },
+      { category: 'Gifts', value: 80 },
+      { category: 'Groceries', value: 74 },
+    ]);
   });
 
   it('honours an explicit month and falls back when it is not comparable', async () => {

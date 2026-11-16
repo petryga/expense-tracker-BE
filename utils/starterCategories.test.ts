@@ -47,18 +47,18 @@ describe('provisionStarterCategoriesForUser', () => {
     });
   });
 
+  it('no longer creates a Gifts category: gifts are a flag on the expense', async () => {
+    await provisionStarterCategoriesForUser(USER_ID);
+    const names = vi
+      .mocked(Category.create)
+      .mock.calls.map(([attrs]) => (attrs as { name: string }).name);
+    expect(names).not.toContain('Gifts');
+  });
+
   it('creates every starter top-level category as isDefault:false, owned by the user', async () => {
     await provisionStarterCategoriesForUser(USER_ID);
 
-    const topLevelNames = [
-      'Fees',
-      'Transportation',
-      'Lifestyle',
-      'Shopping',
-      'Health',
-      'Gifts',
-      'Rewards',
-    ];
+    const topLevelNames = ['Fees', 'Transportation', 'Lifestyle', 'Shopping', 'Health', 'Rewards'];
     for (const name of topLevelNames) {
       expect(Category.create).toHaveBeenCalledWith(
         { name, parentCategoryId: null, isDefault: false, userId: USER_ID },

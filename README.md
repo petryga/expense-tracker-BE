@@ -98,10 +98,10 @@ Upload an Amex activity CSV (the detailed export, which has a unique `Reference`
 
 Each new draft purchase gets a suggested category, in two steps (`utils/imports/suggest.ts`):
 
-1. **Merchant memory, before the upload responds.** If you saved a row from the same shop in an earlier import, the category you chose most often for it is suggested (`merchantMemory.ts`; the shop key is `statementParsers/memoryKey.ts`, the same rule the AI eval measured). Free and instant.
+1. **Merchant memory, before the upload responds.** If you saved a row from the same shop in an earlier import, the category its expense has most often *now* is suggested (recategorizing an expense later updates memory; a deleted one is forgotten) (`merchantMemory.ts`; the shop key is `statementParsers/memoryKey.ts`, the same rule the AI eval measured). Free and instant.
 2. **The AI service, in the background**, for the rest, when `AI_CATEGORIZE_ENABLED=true` (with `AI_SERVICE_URL` and `AI_SHARED_SECRET`). The upload does not wait: those rows are `pending`, and the review page refreshes until they settle. The client (`aiClient.ts`) treats the service like any third party: a timeout (`AI_TIMEOUT_MS`, default 5 min, since a local model can take minutes), the response shape is checked, and only categories the user actually has are kept. Any failure settles the rows as no suggestion; a row left `pending` long past the timeout (a restart mid-job) reads as settled. The bank's own category goes along as a hint, and the request id in `X-Request-Id`. Off for the demo user.
 
-Each row reports `suggestedCategory`, `suggestionSource` (`memory` or `model`) and `suggestionStatus` (`pending`, `done`, `none`). Gifts is never suggested: whether something was a gift isn't on the statement.
+Each row reports `suggestedCategory`, `suggestionSource` (`memory` or `model`) and `suggestionStatus` (`pending`, `done`, `none`). Whether something was a gift isn't on the statement, so suggestions never deal with it: a gift is a checkbox you tick on review, and the row keeps its real category.
 
 ## Logging
 

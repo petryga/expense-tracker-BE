@@ -14,6 +14,8 @@ export interface ConfirmDecision {
   action: ConfirmAction;
   category?: string;
   description?: string;
+  // Bought as a gift: the expense keeps its real category and gets the flag.
+  isGift?: boolean;
 }
 
 const isoDateParts = (iso: string) => ({
@@ -102,6 +104,7 @@ export const confirmImport = async (
             datePosted: row.postedDate,
             currency: batch.currency,
             ...isoDateParts(row.postedDate),
+            isGift: decision.isGift === true,
             userId,
           },
           { transaction },

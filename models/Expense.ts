@@ -17,6 +17,8 @@ export class Expense extends Model {
   declare datePosted: string;
   declare currency: Currency | '';
   declare userId: string;
+  // Bought as a gift; reports count it under Gifts (see utils/gifts.ts).
+  declare isGift: boolean;
 }
 
 Expense.init(
@@ -72,6 +74,11 @@ Expense.init(
     userId: {
       type: DataTypes.UUID,
       allowNull: true,
+    },
+    isGift: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
     },
   },
   {

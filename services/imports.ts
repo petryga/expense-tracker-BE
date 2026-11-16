@@ -140,7 +140,8 @@ router.post('/:id/confirm', async (req, res) => {
         UUID.test(r.id) &&
         ACTIONS.has(r.action) &&
         (r.category === undefined || typeof r.category === 'string') &&
-        (r.description === undefined || typeof r.description === 'string'),
+        (r.description === undefined || typeof r.description === 'string') &&
+        (r.isGift === undefined || typeof r.isGift === 'boolean'),
     );
   if (!valid) {
     return res.status(400).json({

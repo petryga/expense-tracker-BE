@@ -9,6 +9,7 @@ interface ExpenseBody {
   datePosted: string;
   id: string;
   currency: Currency | '';
+  isGift?: unknown;
 }
 
 export const createExpenseObject = (body: ExpenseBody, userId: string | null) => {
@@ -16,7 +17,7 @@ export const createExpenseObject = (body: ExpenseBody, userId: string | null) =>
   // client-side for optimistic UI (see EditToolBar.tsx), so `id` is a
   // legitimate field to accept, but nothing else the client sends (e.g. a
   // forged createdAt/updatedAt) should reach the database.
-  const { id, category, amount, account, description, datePosted, currency } = body;
+  const { id, category, amount, account, description, datePosted, currency, isGift } = body;
   // Throws InvalidDateError for a missing/garbled date. Letting it through used
   // to store year/month as null, which silently dropped the expense from every
   // monthly total and spawned a "null-null" rollup row.
@@ -29,6 +30,8 @@ export const createExpenseObject = (body: ExpenseBody, userId: string | null) =>
     description,
     datePosted,
     currency,
+    // Only a real `true` marks a gift; anything else (missing, "yes") is not.
+    isGift: isGift === true,
     year,
     month,
     userId,

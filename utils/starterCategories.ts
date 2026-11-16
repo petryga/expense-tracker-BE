@@ -45,10 +45,6 @@ const STARTER_TOP_LEVEL_CATEGORIES: {
     subcategories: [{ name: 'Medical Expenses' }, { name: 'Pharmacy' }, { name: 'Wellness & Spa' }],
   },
   {
-    name: 'Gifts',
-    subcategories: [{ name: 'Gifts' }],
-  },
-  {
     name: 'Rewards',
     subcategories: [{ name: 'Credit Card Rewards' }],
   },

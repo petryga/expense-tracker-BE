@@ -280,6 +280,28 @@ describe('statement import (real database)', () => {
     expect((await upload(user, SEPTEMBER)).status).toBe(201);
   });
 
+  it('saves a row confirmed as a gift with its real category and the gift flag', async () => {
+    const user = newUser();
+    const sep = await upload(user, SEPTEMBER);
+    const groceries = byDesc(sep.body.rows, 'WHOLE FOODS');
+    const res = await confirm(user, sep.body.id, [
+      { id: groceries.id, action: 'save', category: 'Groceries', isGift: true },
+    ]);
+    expect(res.status).toBe(200);
+    const [expense] = await Expense.findAll({ where: { userId: user } });
+    expect(expense).toMatchObject({ category: 'Groceries', isGift: true });
+    // A non-boolean isGift is rejected rather than guessed.
+    const bad = await confirm(user, sep.body.id, [
+      {
+        id: byDesc(sep.body.rows, 'LENSWORKS').id,
+        action: 'save',
+        category: 'Eyewear',
+        isGift: 'yes',
+      },
+    ]);
+    expect(bad.status).toBe(400);
+  });
+
   it('puts skipped rows back into review, and only skipped rows', async () => {
     const user = newUser();
     const sep = await upload(user, SEPTEMBER);
@@ -379,7 +401,7 @@ describe('category suggestions: memory now, the AI service in the background', (
   // background job and storage run against a real database.
   const giveCategories = async (userId: string) => {
     const food = await Category.create({ name: 'Food', userId, isDefault: false });
-    for (const name of ['Groceries', 'Gifts', 'Eyewear'])
+    for (const name of ['Groceries', 'Eyewear'])
       await Category.create({ name, userId, parentCategoryId: food.id, isDefault: false });
   };
   // Answers Groceries for the grocery row, nothing for the rest. `gate` holds
@@ -454,7 +476,7 @@ describe('category suggestions: memory now, the AI service in the background', (
       suggestedCategory: null,
       suggestionStatus: 'none',
     });
-    // The bank's own category goes along as a hint; Gifts is never offered.
+    // The user's categories are offered as they are.
     const sent = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
     expect([...sent.categories].sort()).toEqual(['Eyewear', 'Groceries']);
   });
@@ -502,19 +524,54 @@ describe('category suggestions: memory now, the AI service in the background', (
     ]);
   });
 
-  it('never remembers a gift', async () => {
+  it('follows a later recategorization of the expense, and forgets deleted ones', async () => {
     const user = newUser();
     await giveCategories(user);
     vi.stubEnv('AI_CATEGORIZE_ENABLED', 'false');
     const sep = await upload(user, SEPTEMBER);
     await confirm(user, sep.body.id, [
-      { id: byDesc(sep.body.rows, 'LENSWORKS').id, action: 'save', category: 'Gifts' },
+      { id: byDesc(sep.body.rows, 'LENSWORKS').id, action: 'save', category: 'Groceries' },
+      { id: byDesc(sep.body.rows, 'WHOLE FOODS').id, action: 'save', category: 'Groceries' },
+    ]);
+    // Later, in the expenses grid: one fixed to a new category, one deleted.
+    await Expense.update({ category: 'Eyewear' }, { where: { userId: user, amount: 60 } });
+    await Expense.destroy({ where: { userId: user, amount: 82.1 } });
+
+    const res = await upload(
+      user,
+      csv([
+        ['11/02/2026', 'LENSWORKS OPTICAL SPRINGFIELD', '45.00', "'4101"],
+        ['11/03/2026', 'WHOLE FOODS MKT AUSTIN TX', '30.00', "'4102"],
+      ]),
+    );
+    expect(byDesc(res.body.rows, 'LENSWORKS')).toMatchObject({
+      suggestedCategory: 'Eyewear',
+      suggestionSource: 'memory',
+    });
+    expect(byDesc(res.body.rows, 'WHOLE FOODS')).toMatchObject({ suggestedCategory: null });
+  });
+
+  it("learns a gift's real category: a gift is a checkbox, not a category", async () => {
+    const user = newUser();
+    await giveCategories(user);
+    vi.stubEnv('AI_CATEGORIZE_ENABLED', 'false');
+    const sep = await upload(user, SEPTEMBER);
+    await confirm(user, sep.body.id, [
+      {
+        id: byDesc(sep.body.rows, 'LENSWORKS').id,
+        action: 'save',
+        category: 'Eyewear',
+        isGift: true,
+      },
     ]);
     const res = await upload(
       user,
       csv([['11/02/2026', 'LENSWORKS OPTICAL SPRINGFIELD', '45.00', "'4003"]]),
     );
-    expect(res.body.rows[0]).toMatchObject({ suggestedCategory: null, suggestionStatus: 'none' });
+    expect(res.body.rows[0]).toMatchObject({
+      suggestedCategory: 'Eyewear',
+      suggestionSource: 'memory',
+    });
   });
 
   it('settles every pending row as no suggestion when the AI service is down', async () => {

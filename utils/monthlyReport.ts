@@ -1,8 +1,10 @@
 import { Op } from 'sequelize';
 import { Currency, Expense } from '../models/Expense.js';
+import { reportCategory } from './gifts.js';
 
 export interface ReportExpense {
   category: string | null;
+  isGift?: boolean | null;
   description: string;
   amount: number | string;
   currency: string;
@@ -35,7 +37,7 @@ export const buildMonthlyReport = (yearMonth: string, expenses: ReportExpense[])
     const amount = Number(expense.amount);
     if (!Number.isFinite(amount) || amount <= 0) continue;
 
-    const category = expense.category?.trim() || 'Uncategorized';
+    const category = reportCategory(expense.category, expense.isGift);
     const entry = byCategory.get(category) ?? { category, total: 0, details: [] };
 
     if (expense.currency === Currency.CAD) {

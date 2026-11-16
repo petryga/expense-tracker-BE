@@ -5,7 +5,7 @@ import { isDemoUser } from '../importAccess.js';
 import { logger } from '../logger.js';
 import { memoryKey } from '../statementParsers/memoryKey.js';
 import { aiConfig, requestSuggestions } from './aiClient.js';
-import { merchantMemory, NEVER_SUGGEST } from './merchantMemory.js';
+import { merchantMemory } from './merchantMemory.js';
 
 // Suggestions for a fresh import, in two steps (PLANS.md, Phase B):
 // 1. merchant memory, right away, before the upload responds;
@@ -20,11 +20,7 @@ const pickableCategories = async (userId: string | null) => {
     where: { [Op.or]: [{ isDefault: true }, { userId }] },
     attributes: ['name', 'parentCategoryId'],
   });
-  return [
-    ...new Set(
-      visible.filter((c) => c.parentCategoryId && !NEVER_SUGGEST.has(c.name)).map((c) => c.name),
-    ),
-  ];
+  return [...new Set(visible.filter((c) => c.parentCategoryId).map((c) => c.name))];
 };
 
 const draftPurchases = (userId: string | null, batchId: string) =>
