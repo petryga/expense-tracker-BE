@@ -34,8 +34,7 @@ const STARTER_TOP_LEVEL_CATEGORIES: {
     name: 'Shopping',
     subcategories: [
       { name: 'Clothing', budget: 50 },
-      { name: 'Household Goods' },
-      { name: 'Furniture & Housewares', budget: 100 },
+      { name: 'Home', budget: 100 },
       { name: 'Beauty', budget: 50 },
       { name: 'Hobbies' },
     ],
