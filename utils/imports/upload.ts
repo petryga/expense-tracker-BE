@@ -4,6 +4,7 @@ import type { Currency } from '../../models/Expense.js';
 import { ImportBatch } from '../../models/ImportBatch.js';
 import { ImportedTransaction } from '../../models/ImportedTransaction.js';
 import { parseAmex } from '../statementParsers/amex.js';
+import { matchAmazonCharges } from './amazon.js';
 import { ImportInputError } from './errors.js';
 import { pairRefunds } from './pairing.js';
 import { lockUser } from './userLock.js';
@@ -81,6 +82,8 @@ export const uploadStatement = async (userId: string | null, input: UploadInput)
     }
 
     await pairRefunds(userId, transaction);
+    // Amazon charges split into their items, when the order history is uploaded.
+    await matchAmazonCharges(userId, transaction);
     return { id: batch.id, rowCount: parsed.transactions.length };
   });
 };

@@ -1,4 +1,5 @@
 import { sequelize } from '../../config/database.js';
+import { ImportedItem } from '../../models/ImportedItem.js';
 import { ImportedTransaction } from '../../models/ImportedTransaction.js';
 import { ImportInputError } from './errors.js';
 import { pairRefunds } from './pairing.js';
@@ -28,6 +29,10 @@ export const reopenRows = async (userId: string | null, batchId: string, rowIds:
     for (const row of rows) {
       await row.update({ status: 'draft', category: null }, { transaction });
     }
+    await ImportedItem.update(
+      { category: null },
+      { where: { userId, transactionId: rows.map((r) => r.id) }, transaction },
+    );
     await pairRefunds(userId, transaction);
     return { reopened: rows.length };
   });

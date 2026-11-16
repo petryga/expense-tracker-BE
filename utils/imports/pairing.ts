@@ -1,6 +1,7 @@
 import type { Transaction } from 'sequelize';
 import { ImportedTransaction } from '../../models/ImportedTransaction.js';
 import { matchRefunds } from '../statementParsers/refundMatching.js';
+import { pairItemRefunds } from './itemRefundPairing.js';
 
 // Pairs every unpaired refund with an unpaired purchase across all of the
 // user's imports (any month, any upload). A purchase that is still a draft or
@@ -14,6 +15,12 @@ export const pairingHooks = { beforePairing: async (): Promise<void> => {} };
 
 export const pairRefunds = async (userId: string | null, transaction: Transaction) => {
   await pairingHooks.beforePairing();
+  await pairWholeCharges(userId, transaction);
+  // Then refunds of single items of split Amazon charges.
+  await pairItemRefunds(userId, transaction);
+};
+
+const pairWholeCharges = async (userId: string | null, transaction: Transaction) => {
   const [charges, refunds] = await Promise.all([
     ImportedTransaction.findAll({
       where: {
@@ -25,7 +32,13 @@ export const pairRefunds = async (userId: string | null, transaction: Transactio
       transaction,
     }),
     ImportedTransaction.findAll({
-      where: { userId, kind: 'refund', matchedTransactionId: null, status: ['draft', 'skipped'] },
+      where: {
+        userId,
+        kind: 'refund',
+        matchedTransactionId: null,
+        matchedItemId: null,
+        status: ['draft', 'skipped'],
+      },
       transaction,
     }),
   ]);

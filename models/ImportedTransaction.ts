@@ -4,6 +4,12 @@ import type { TransactionKind } from '../utils/statementParsers/types.js';
 
 export type ImportStatus = 'draft' | 'saved' | 'skipped' | 'returned';
 export type SuggestionStatus = 'pending' | 'done' | 'none';
+export type AmazonStatus = 'matched' | 'ambiguous' | 'declined';
+export interface AmazonCandidate {
+  key: string;
+  itemIds: string[];
+  partial?: boolean;
+}
 
 export class ImportedTransaction extends Model {
   declare id: string;
@@ -25,6 +31,10 @@ export class ImportedTransaction extends Model {
   declare suggestedCategory: string | null;
   declare suggestionSource: string | null;
   declare suggestionStatus: SuggestionStatus | null;
+  declare amazonStatus: AmazonStatus | null;
+  declare amazonCandidates: AmazonCandidate[] | null;
+  // A refund that returns one item of a split Amazon charge.
+  declare matchedItemId: string | null;
   declare updatedAt: Date;
 }
 
@@ -54,6 +64,9 @@ ImportedTransaction.init(
     suggestedCategory: { type: DataTypes.STRING, allowNull: true },
     suggestionSource: { type: DataTypes.STRING, allowNull: true },
     suggestionStatus: { type: DataTypes.STRING, allowNull: true },
+    amazonStatus: { type: DataTypes.STRING, allowNull: true },
+    amazonCandidates: { type: DataTypes.JSONB, allowNull: true },
+    matchedItemId: { type: DataTypes.UUID, allowNull: true },
     createdAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
     updatedAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
   },

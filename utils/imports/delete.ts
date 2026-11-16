@@ -1,7 +1,9 @@
 import { Op } from 'sequelize';
 import { sequelize } from '../../config/database.js';
 import { Expense } from '../../models/Expense.js';
+import { ImportedItem } from '../../models/ImportedItem.js';
 import { ImportedTransaction } from '../../models/ImportedTransaction.js';
+import { unpairItems } from './itemRefundPairing.js';
 import { pairRefunds } from './pairing.js';
 import { findOwnBatch, lockUser } from './userLock.js';
 
@@ -24,7 +26,14 @@ export const deleteImport = async (
       transaction,
     });
     const ids = rows.map((r) => r.id);
-    const expenseIds = rows.map((r) => r.expenseId).filter((id): id is string => !!id);
+    const items = await ImportedItem.findAll({
+      where: { userId, transactionId: ids },
+      attributes: ['id', 'expenseId'],
+      transaction,
+    });
+    const expenseIds = [...rows, ...items]
+      .map((r) => r.expenseId)
+      .filter((id): id is string => !!id);
 
     const deletedExpenses =
       !keepExpenses && expenseIds.length
@@ -44,6 +53,8 @@ export const deleteImport = async (
         { transaction },
       );
     }
+    // Single-item refund pairs that cross into other imports come apart too.
+    await unpairItems(userId, { refundIds: ids, itemIds: items.map((i) => i.id) }, transaction);
     await ImportedTransaction.destroy({ where: { batchId, userId }, transaction });
     await batch.destroy({ transaction });
     await pairRefunds(userId, transaction);
