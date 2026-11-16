@@ -2,10 +2,19 @@ import { Expense } from '../../models/Expense.js';
 import { ImportBatch } from '../../models/ImportBatch.js';
 import { ImportedTransaction } from '../../models/ImportedTransaction.js';
 import { displayDescription } from '../statementParsers/merchant.js';
+import { aiConfig } from './aiClient.js';
 import { findOwnBatch } from './userLock.js';
 
 // What the API returns about imports: per-import counts and reconciliation,
 // and the rows of one import with the row each is paired with.
+
+// A row still 'pending' long after the AI timeout lost its job (say, a server
+// restart): report it as settled with no suggestion, so the page stops waiting.
+const settledStatus = (row: ImportedTransaction) => {
+  if (row.suggestionStatus !== 'pending') return row.suggestionStatus ?? 'none';
+  const limit = (aiConfig()?.timeoutMs ?? 300_000) + 60_000;
+  return Date.now() - new Date(row.updatedAt).getTime() > limit ? 'none' : 'pending';
+};
 
 // BIGINT columns come back from pg as strings.
 const toCents = (value: string | number) => Number(value);
@@ -102,6 +111,7 @@ export const getImport = async (userId: string | null, batchId: string) => {
         category: row.category,
         suggestedCategory: row.suggestedCategory ?? null,
         suggestionSource: row.suggestionSource ?? null,
+        suggestionStatus: settledStatus(row),
         expenseId: row.expenseId,
         amexCategory: row.raw.Category || null,
         matched: match

@@ -374,20 +374,19 @@ describe('statement import (real database)', () => {
   });
 });
 
-describe('AI category suggestions on upload', () => {
-  // The AI service is faked at the network: BE's real client, validation and
-  // storage run, against a real database.
+describe('category suggestions: memory now, the AI service in the background', () => {
+  // The AI service is faked at the network: BE's real client, validation,
+  // background job and storage run against a real database.
   const giveCategories = async (userId: string) => {
     const food = await Category.create({ name: 'Food', userId, isDefault: false });
-    await Category.create({
-      name: 'Groceries',
-      userId,
-      parentCategoryId: food.id,
-      isDefault: false,
-    });
+    for (const name of ['Groceries', 'Gifts', 'Eyewear'])
+      await Category.create({ name, userId, parentCategoryId: food.id, isDefault: false });
   };
-  const aiAnswers = (category: string) =>
+  // Answers Groceries for the grocery row, nothing for the rest. `gate` holds
+  // the answer back until the test lets it through.
+  const fakeAi = (gate: Promise<void> = Promise.resolve(), category = 'Groceries') =>
     vi.fn(async (_url: string, init: RequestInit) => {
+      await gate;
       const { rows } = JSON.parse(init.body as string) as { rows: { id: string; text: string }[] };
       return new Response(
         JSON.stringify({
@@ -399,79 +398,164 @@ describe('AI category suggestions on upload', () => {
         }),
       );
     });
+  const sentRows = (fetchMock: ReturnType<typeof vi.fn>) =>
+    JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string).rows as {
+      text: string;
+      bankCategory?: string;
+    }[];
+  // Waits until no row of the import is pending any more.
+  const settled = async (user: string, batchId: string) => {
+    for (let i = 0; i < 100; i++) {
+      const res = await as(request(app).get(`/imports/${batchId}`), user);
+      if (
+        !(res.body.rows as Row[]).some(
+          (r: Row & { suggestionStatus?: string }) => r.suggestionStatus === 'pending',
+        )
+      )
+        return res.body;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    throw new Error('suggestions never settled');
+  };
 
   beforeEach(() => {
     vi.stubEnv('AI_CATEGORIZE_ENABLED', 'true');
     vi.stubEnv('AI_SERVICE_URL', 'http://ai.test');
     vi.stubEnv('AI_SHARED_SECRET', 'test');
-    vi.stubEnv('AI_TIMEOUT_MS', '200');
+    vi.stubEnv('AI_TIMEOUT_MS', '2000');
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it("stores a suggestion for draft purchases, only ever one of the user's categories", async () => {
+  it('responds before the AI answers, then fills the suggestion in', async () => {
     const user = newUser();
     await giveCategories(user);
-    const fetchMock = aiAnswers('Groceries');
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const fetchMock = fakeAi(gate);
     vi.stubGlobal('fetch', fetchMock);
 
     const res = await upload(user, SEPTEMBER);
     expect(res.status).toBe(201);
-    expect(byDesc(res.body.rows, 'WHOLE FOODS')).toMatchObject({
+    // The AI has not answered yet: the purchases are pending, the rest untouched.
+    const charges = (res.body.rows as (Row & { suggestionStatus: string })[]).filter(
+      (r) => r.kind === 'charge',
+    );
+    expect(charges.map((r) => r.suggestionStatus)).toEqual(['pending', 'pending', 'pending']);
+
+    release();
+    const after = await settled(user, res.body.id);
+    expect(byDesc(after.rows, 'WHOLE FOODS')).toMatchObject({
       suggestedCategory: 'Groceries',
       suggestionSource: 'model',
+      suggestionStatus: 'done',
     });
-    expect(byDesc(res.body.rows, 'LENSWORKS')).toMatchObject({ suggestedCategory: null });
-    // Only draft purchases are sent: not the payment or the reward.
+    // No answer for a row is a settled "no suggestion".
+    expect(byDesc(after.rows, 'LENSWORKS')).toMatchObject({
+      suggestedCategory: null,
+      suggestionStatus: 'none',
+    });
+    // The bank's own category goes along as a hint; Gifts is never offered.
     const sent = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
-    expect(sent.rows).toHaveLength(3);
-    expect(sent.categories).toEqual(['Groceries']);
+    expect([...sent.categories].sort()).toEqual(['Eyewear', 'Groceries']);
   });
 
-  it('ignores a suggested category the user does not have', async () => {
+  it('remembers the category saved for a shop and does not ask the AI about it again', async () => {
     const user = newUser();
     await giveCategories(user);
-    vi.stubGlobal('fetch', aiAnswers('Yachts'));
-    const res = await upload(user, SEPTEMBER);
-    expect(byDesc(res.body.rows, 'WHOLE FOODS').suggestedCategory).toBeNull();
+    vi.stubEnv('AI_CATEGORIZE_ENABLED', 'false');
+    const sep = await upload(user, SEPTEMBER);
+    await confirm(user, sep.body.id, [
+      { id: byDesc(sep.body.rows, 'LENSWORKS').id, action: 'save', category: 'Eyewear' },
+    ]);
+
+    vi.stubEnv('AI_CATEGORIZE_ENABLED', 'true');
+    const fetchMock = fakeAi();
+    vi.stubGlobal('fetch', fetchMock);
+    const next = csv([
+      ['11/02/2026', 'AplPay LENSWORKS OPTICAL SPRINGFIELD', '45.00', "'4001"],
+      ['11/03/2026', 'WHOLE FOODS MKT AUSTIN TX', '30.00', "'4002"],
+    ]);
+    const res = await upload(user, next);
+    // Memory answered before the response, already settled.
+    expect(byDesc(res.body.rows, 'LENSWORKS')).toMatchObject({
+      suggestedCategory: 'Eyewear',
+      suggestionSource: 'memory',
+      suggestionStatus: 'done',
+    });
+    await settled(user, res.body.id);
+    expect(sentRows(fetchMock).map((r) => r.text)).toEqual(['WHOLE FOODS MKT AUSTIN TX']);
   });
 
-  it('imports normally when the AI service is down or slow', async () => {
+  it("sends the bank's own category along as a hint", async () => {
+    const user = newUser();
+    await giveCategories(user);
+    const fetchMock = fakeAi();
+    vi.stubGlobal('fetch', fetchMock);
+    const withCategory = [
+      'Date,Description,Amount,Reference,Category',
+      `11/04/2026,"WHOLE FOODS MKT AUSTIN TX",30.00,'5001,Merchandise & Supplies-Groceries`,
+    ].join('\n');
+    const res = await upload(user, withCategory);
+    await settled(user, res.body.id);
+    expect(sentRows(fetchMock)).toEqual([
+      expect.objectContaining({ bankCategory: 'Merchandise & Supplies-Groceries' }),
+    ]);
+  });
+
+  it('never remembers a gift', async () => {
+    const user = newUser();
+    await giveCategories(user);
+    vi.stubEnv('AI_CATEGORIZE_ENABLED', 'false');
+    const sep = await upload(user, SEPTEMBER);
+    await confirm(user, sep.body.id, [
+      { id: byDesc(sep.body.rows, 'LENSWORKS').id, action: 'save', category: 'Gifts' },
+    ]);
+    const res = await upload(
+      user,
+      csv([['11/02/2026', 'LENSWORKS OPTICAL SPRINGFIELD', '45.00', "'4003"]]),
+    );
+    expect(res.body.rows[0]).toMatchObject({ suggestedCategory: null, suggestionStatus: 'none' });
+  });
+
+  it('settles every pending row as no suggestion when the AI service is down', async () => {
     const user = newUser();
     await giveCategories(user);
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => Promise.reject(new TypeError('fetch failed'))),
     );
-    const down = await upload(user, SEPTEMBER);
-    expect(down.status).toBe(201);
+    const res = await upload(user, SEPTEMBER);
+    expect(res.status).toBe(201);
+    const after = await settled(user, res.body.id);
+    const charges = (
+      after.rows as (Row & { suggestionStatus: string; suggestedCategory: unknown })[]
+    ).filter((r) => r.kind === 'charge');
     expect(
-      down.body.rows.every((r: { suggestedCategory: unknown }) => r.suggestedCategory === null),
+      charges.every((r) => r.suggestionStatus === 'none' && r.suggestedCategory === null),
     ).toBe(true);
+    expect(after.reconciliation.balanced).toBe(true);
+  });
 
-    const other = newUser();
-    await giveCategories(other);
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(
-        (_url: string, init: RequestInit) =>
-          new Promise((_resolve, reject) =>
-            init.signal?.addEventListener('abort', () => reject(init.signal?.reason)),
-          ),
-      ),
-    );
-    const slow = await upload(other, SEPTEMBER);
-    expect(slow.status).toBe(201);
-    expect(slow.body.reconciliation.balanced).toBe(true);
+  it('ignores a suggested category the user does not have', async () => {
+    const user = newUser();
+    await giveCategories(user);
+    vi.stubGlobal('fetch', fakeAi(Promise.resolve(), 'Yachts'));
+    const res = await upload(user, SEPTEMBER);
+    const after = await settled(user, res.body.id);
+    expect(byDesc(after.rows, 'WHOLE FOODS')).toMatchObject({ suggestedCategory: null });
   });
 
   it('does not call the AI service when the feature is off, or for the demo user', async () => {
-    const fetchMock = aiAnswers('Groceries');
+    const fetchMock = fakeAi();
     vi.stubGlobal('fetch', fetchMock);
     const user = newUser();
     await giveCategories(user);
 
     vi.stubEnv('AI_CATEGORIZE_ENABLED', 'false');
-    await upload(user, SEPTEMBER);
+    const off = await upload(user, SEPTEMBER);
+    expect(
+      off.body.rows.every((r: { suggestionStatus: string }) => r.suggestionStatus === 'none'),
+    ).toBe(true);
 
     vi.stubEnv('AI_CATEGORIZE_ENABLED', 'true');
     vi.stubEnv('AUTH_DISABLED', '');

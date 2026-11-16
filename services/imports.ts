@@ -89,7 +89,8 @@ router.post('/', async (req, res) => {
       currency,
     });
     if (!id) return res.status(200).json({ id: null, rowCount, duplicateCount: rowCount });
-    // Never fails the import: without suggestions the rows are simply blank.
+    // Memory answers before this responds; the AI service works in the
+    // background (not awaited). Never fails the import.
     await suggestForImport(req.userId, id, req.id as string);
     res.status(201).json(await getImport(req.userId, id));
   } catch (error) {

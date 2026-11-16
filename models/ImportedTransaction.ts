@@ -3,6 +3,7 @@ import { sequelize } from '../config/database.js';
 import type { TransactionKind } from '../utils/statementParsers/types.js';
 
 export type ImportStatus = 'draft' | 'saved' | 'skipped' | 'returned';
+export type SuggestionStatus = 'pending' | 'done' | 'none';
 
 export class ImportedTransaction extends Model {
   declare id: string;
@@ -23,6 +24,8 @@ export class ImportedTransaction extends Model {
   declare matchedTransactionId: string | null;
   declare suggestedCategory: string | null;
   declare suggestionSource: string | null;
+  declare suggestionStatus: SuggestionStatus | null;
+  declare updatedAt: Date;
 }
 
 ImportedTransaction.init(
@@ -50,6 +53,7 @@ ImportedTransaction.init(
     matchedTransactionId: { type: DataTypes.UUID, allowNull: true },
     suggestedCategory: { type: DataTypes.STRING, allowNull: true },
     suggestionSource: { type: DataTypes.STRING, allowNull: true },
+    suggestionStatus: { type: DataTypes.STRING, allowNull: true },
     createdAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
     updatedAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
   },

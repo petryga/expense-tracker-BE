@@ -10,6 +10,7 @@ export interface SuggestionRequestRow {
   id: string;
   text: string;
   amountCents: number;
+  bankCategory?: string;
 }
 
 export interface AiConfig {
@@ -24,7 +25,9 @@ export const aiConfig = (): AiConfig | null => {
   const url = process.env.AI_SERVICE_URL?.replace(/\/+$/, '');
   const secret = process.env.AI_SHARED_SECRET;
   if (!url || !secret) return null;
-  const timeoutMs = Number(process.env.AI_TIMEOUT_MS) || 8000;
+  // Suggestions run in the background, so the limit is generous: a local model
+  // needs 1-3 minutes for a month of rows, Claude a few seconds.
+  const timeoutMs = Number(process.env.AI_TIMEOUT_MS) || 300_000;
   return { url, secret, timeoutMs };
 };
 
