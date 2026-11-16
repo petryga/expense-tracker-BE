@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import express from 'express';
 import request from 'supertest';
+import type { Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 
 // FRONTEND_URL is read at module load time, so it must be set before the
 // first import of ./app.js anywhere in the process.
@@ -55,6 +57,22 @@ describe('CORS', () => {
   });
 });
 
+// One server per test, on 127.0.0.1, for all of its requests. `request(app)`
+// starts a new server on a new port for every request; at 100+ requests,
+// with other test runs doing the same, a freed port could be reused by
+// another process's server and a request would land on the wrong app (a stray
+// 404, or a 200 counted by someone else's limiter).
+const withServer = async (testApp: express.Express, run: (url: string) => Promise<void>) => {
+  const server = await new Promise<Server>((resolve) => {
+    const s = testApp.listen(0, '127.0.0.1', () => resolve(s));
+  });
+  try {
+    await run(`http://127.0.0.1:${(server.address() as AddressInfo).port}`);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+};
+
 describe('rate limiting', () => {
   // A developer's .env may switch the limiter off; the test must not depend on it.
   afterEach(() => vi.unstubAllEnvs());
@@ -63,18 +81,18 @@ describe('rate limiting', () => {
     // Isolated instance/app so this doesn't share counters with the
     // app-wide limiter or other tests.
     vi.stubEnv('RATE_LIMIT_DISABLED', 'false');
-    const limiter = createApiLimiter();
     const testApp = express();
-    testApp.use(limiter);
+    testApp.use(createApiLimiter());
     testApp.get('/', (req, res) => res.status(200).json({ ok: true }));
 
-    for (let i = 0; i < 100; i++) {
-      const res = await request(testApp).get('/');
-      expect(res.status).toBe(200);
-    }
-
-    const blocked = await request(testApp).get('/');
-    expect(blocked.status).toBe(429);
+    await withServer(testApp, async (url) => {
+      for (let i = 0; i < 100; i++) {
+        const res = await request(url).get('/');
+        expect(res.status).toBe(200);
+      }
+      const blocked = await request(url).get('/');
+      expect(blocked.status).toBe(429);
+    });
   });
 });
 
@@ -87,8 +105,10 @@ describe('rate limiting switch', () => {
     testApp.use(createApiLimiter());
     testApp.get('/', (req, res) => res.status(200).json({ ok: true }));
 
-    for (let i = 0; i < 105; i++) {
-      expect((await request(testApp).get('/')).status).toBe(200);
-    }
+    await withServer(testApp, async (url) => {
+      for (let i = 0; i < 105; i++) {
+        expect((await request(url).get('/')).status).toBe(200);
+      }
+    });
   });
 });
