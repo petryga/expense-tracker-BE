@@ -19,7 +19,7 @@ const csv = (rows: [string, string, string, string][]) =>
 const SEPTEMBER = csv([
   ['09/02/2026', 'WHOLE FOODS MKT AUSTIN TX', '82.10', "'1001"],
   ['09/10/2026', 'AMAZON.COM*AB12C', '24.99', "'1002"],
-  ['09/12/2026', 'ZENNI OPTICAL INC NOVATO', '60.00', "'1003"],
+  ['09/12/2026', 'LENSWORKS OPTICAL SPRINGFIELD', '60.00', "'1003"],
   ['09/20/2026', 'AUTOPAY PAYMENT - THANK YOU', '-500.00', "'1004"],
   ['09/21/2026', 'YOUR CASH REWARD/REFUND IS', '-3.00', "'1005"],
 ]);
@@ -27,9 +27,9 @@ const SEPTEMBER = csv([
 // Overlaps September by one row, and refunds the Amazon purchase in full and
 // the glasses only in part.
 const OCTOBER = csv([
-  ['09/12/2026', 'ZENNI OPTICAL INC NOVATO', '60.00', "'1003"],
+  ['09/12/2026', 'LENSWORKS OPTICAL SPRINGFIELD', '60.00', "'1003"],
   ['10/03/2026', 'AMAZON MARKEPLACE NA PA', '-24.99', "'2001"],
-  ['10/04/2026', 'ZENNI OPTICAL INC NOVATO', '-20.00', "'2002"],
+  ['10/04/2026', 'LENSWORKS OPTICAL SPRINGFIELD', '-20.00', "'2002"],
   ['10/05/2026', 'STARBUCKS 0123 AUSTIN TX', '5.25', "'2003"],
 ]);
 
@@ -109,7 +109,7 @@ describe('statement import (real database)', () => {
     expect(purchase.matched!.id).toBe(refund.id);
 
     // A partial refund is not paired; it waits for a decision.
-    expect(byDesc(oct.body.rows, 'ZENNI', 'refund')).toMatchObject({
+    expect(byDesc(oct.body.rows, 'LENSWORKS', 'refund')).toMatchObject({
       status: 'draft',
       matched: null,
     });
@@ -255,13 +255,13 @@ describe('statement import (real database)', () => {
     const other = newUser();
     const sep = await upload(user, SEPTEMBER);
     await upload(other, SEPTEMBER);
-    const [groceries, amazon, zenni] = ['WHOLE FOODS', 'AMAZON', 'ZENNI'].map((t) =>
+    const [groceries, amazon, lenses] = ['WHOLE FOODS', 'AMAZON', 'LENSWORKS'].map((t) =>
       byDesc(sep.body.rows, t),
     );
     await confirm(user, sep.body.id, [
       { id: groceries.id, action: 'save', category: 'Groceries' },
       { id: amazon.id, action: 'save', category: 'Shopping' },
-      { id: zenni.id, action: 'skip' },
+      { id: lenses.id, action: 'skip' },
     ]);
     // One of the two saved expenses was already deleted on the Expenses page.
     const saved = await Expense.findAll({ where: { userId: user } });
@@ -283,28 +283,28 @@ describe('statement import (real database)', () => {
   it('puts skipped rows back into review, and only skipped rows', async () => {
     const user = newUser();
     const sep = await upload(user, SEPTEMBER);
-    const [groceries, zenni] = ['WHOLE FOODS', 'ZENNI'].map((t) => byDesc(sep.body.rows, t));
+    const [groceries, lenses] = ['WHOLE FOODS', 'LENSWORKS'].map((t) => byDesc(sep.body.rows, t));
     const payment = byDesc(sep.body.rows, 'AUTOPAY', 'payment');
     await confirm(user, sep.body.id, [
       { id: groceries.id, action: 'save', category: 'Groceries' },
-      { id: zenni.id, action: 'skip' },
+      { id: lenses.id, action: 'skip' },
     ]);
     const reopen = (rowIds: string[], who: string = user) =>
       as(request(app).post(`/imports/${sep.body.id}/reopen`), who).send({ rowIds });
 
-    const res = await reopen([zenni.id, payment.id]);
+    const res = await reopen([lenses.id, payment.id]);
     expect(res.status).toBe(200);
     expect(res.body.reopened).toBe(2);
-    expect(byDesc(res.body.import.rows, 'ZENNI').status).toBe('draft');
+    expect(byDesc(res.body.import.rows, 'LENSWORKS').status).toBe('draft');
     expect(byDesc(res.body.import.rows, 'AUTOPAY', 'payment').status).toBe('draft');
 
     // A saved row can't be reopened this way, and nothing changes.
     expect((await reopen([groceries.id])).status).toBe(400);
-    expect((await reopen([zenni.id], newUser())).status).toBe(404);
+    expect((await reopen([lenses.id], newUser())).status).toBe(404);
 
     // Back in review, it can be saved like any draft.
     const saved = await confirm(user, sep.body.id, [
-      { id: zenni.id, action: 'save', category: 'Health' },
+      { id: lenses.id, action: 'save', category: 'Health' },
     ]);
     expect(saved.body.saved).toBe(1);
   });
@@ -420,7 +420,7 @@ describe('AI category suggestions on upload', () => {
       suggestedCategory: 'Groceries',
       suggestionSource: 'model',
     });
-    expect(byDesc(res.body.rows, 'ZENNI')).toMatchObject({ suggestedCategory: null });
+    expect(byDesc(res.body.rows, 'LENSWORKS')).toMatchObject({ suggestedCategory: null });
     // Only draft purchases are sent: not the payment or the reward.
     const sent = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
     expect(sent.rows).toHaveLength(3);

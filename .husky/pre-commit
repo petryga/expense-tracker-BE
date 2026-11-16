@@ -1,0 +1,7 @@
+# Privacy check: blocks a commit that would publish real statement or order
+# data. The checker lives outside this repo because it reads the owner's private
+# files, so it runs only where it exists; other clones skip it.
+checker="$(git rev-parse --show-toplevel)/../tools/privacy_check.py"
+if [ -f "$checker" ]; then
+  python3 "$checker" || exit 1
+fi
