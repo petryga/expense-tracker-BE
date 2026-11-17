@@ -1,3 +1,4 @@
+import { aiService, callAiService, failureOutcome, type AiService } from '../aiService.js';
 import { logger } from '../logger.js';
 
 // The one place BE/ talks to the AI service (PLANS.md, Plan 3, decisions 11
@@ -23,22 +24,19 @@ export interface ItemExample {
   category: string;
 }
 
-export interface AiConfig {
-  url: string;
-  secret: string;
+export interface AiConfig extends AiService {
   timeoutMs: number;
 }
 
 // Off unless explicitly on and fully configured.
 export const aiConfig = (): AiConfig | null => {
   if (process.env.AI_CATEGORIZE_ENABLED !== 'true') return null;
-  const url = process.env.AI_SERVICE_URL?.replace(/\/+$/, '');
-  const secret = process.env.AI_SHARED_SECRET;
-  if (!url || !secret) return null;
+  const service = aiService();
+  if (!service) return null;
   // Suggestions run in the background, so the limit is generous: a local model
   // needs 1-3 minutes for a month of rows, Claude a few seconds.
   const timeoutMs = Number(process.env.AI_TIMEOUT_MS) || 300_000;
-  return { url, secret, timeoutMs };
+  return { ...service, timeoutMs };
 };
 
 const MAX_ROWS_PER_CALL = 500;
@@ -87,16 +85,12 @@ export const requestSuggestions = async (
   for (let i = 0; i < rows.length; i += MAX_ROWS_PER_CALL) {
     const batch = rows.slice(i, i + MAX_ROWS_PER_CALL);
     try {
-      const res = await fetch(`${config.url}/categorize`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-AI-Secret': config.secret,
-          ...(requestId ? { 'X-Request-Id': requestId } : {}),
-        },
-        body: JSON.stringify({ rows: batch, categories, userId }),
-        signal: AbortSignal.timeout(config.timeoutMs),
-      });
+      const res = await callAiService(
+        config,
+        '/categorize',
+        { rows: batch, categories, userId },
+        { timeoutMs: config.timeoutMs, requestId },
+      );
       if (!res.ok) {
         outcome = 'http_error';
         break;
@@ -108,7 +102,7 @@ export const requestSuggestions = async (
       }
       valid.forEach((category, id) => suggestions.set(id, category));
     } catch (error) {
-      outcome = (error as Error)?.name === 'TimeoutError' ? 'timeout' : 'network_error';
+      outcome = failureOutcome(error);
       break;
     }
   }
@@ -140,19 +134,15 @@ export const syncItemExamples = async (
   const started = Date.now();
   let outcome: Outcome = 'ok';
   try {
-    const res = await fetch(`${config.url}/examples`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-AI-Secret': config.secret,
-        ...(requestId ? { 'X-Request-Id': requestId } : {}),
-      },
-      body: JSON.stringify({ userId, examples: examples.slice(0, MAX_EXAMPLES) }),
-      signal: AbortSignal.timeout(config.timeoutMs),
-    });
+    const res = await callAiService(
+      config,
+      '/examples',
+      { userId, examples: examples.slice(0, MAX_EXAMPLES) },
+      { method: 'PUT', timeoutMs: config.timeoutMs, requestId },
+    );
     if (!res.ok) outcome = 'http_error';
   } catch (error) {
-    outcome = (error as Error)?.name === 'TimeoutError' ? 'timeout' : 'network_error';
+    outcome = failureOutcome(error);
   }
   // Counts and timing only.
   const log = { outcome, examples: examples.length, ms: Date.now() - started, requestId };

@@ -3,8 +3,8 @@
 // item's amount, within MAX_ITEM_REFUND_DAYS after the charge. When items of
 // the same price in different orders qualify, Amazon's refund list (order,
 // amount, date) decides; if it can't, the refund is left for a person.
-export const MAX_ITEM_REFUND_DAYS = 180;
-export const REFUND_DETAIL_DAYS = 7;
+const MAX_ITEM_REFUND_DAYS = 180;
+const REFUND_DETAIL_DAYS = 7;
 
 export interface RefundableItem {
   id: string;

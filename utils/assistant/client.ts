@@ -1,3 +1,4 @@
+import { aiService, callAiService, failureOutcome, type AiService } from '../aiService.js';
 import { logger } from '../logger.js';
 
 // The spending assistant: BE/ checks who may ask and how often, then passes
@@ -16,9 +17,7 @@ export interface AssistantReply {
   toolCalls: string[];
 }
 
-export interface AssistantConfig {
-  url: string;
-  secret: string;
+export interface AssistantConfig extends AiService {
   timeoutMs: number;
   dailyLimit: number;
 }
@@ -26,12 +25,10 @@ export interface AssistantConfig {
 // Off unless explicitly on and the AI service is configured.
 export const assistantConfig = (): AssistantConfig | null => {
   if (process.env.AI_ASSISTANT_ENABLED !== 'true') return null;
-  const url = process.env.AI_SERVICE_URL?.replace(/\/+$/, '');
-  const secret = process.env.AI_SHARED_SECRET;
-  if (!url || !secret) return null;
+  const service = aiService();
+  if (!service) return null;
   return {
-    url,
-    secret,
+    ...service,
     // A question takes a few model calls and tool calls; the AI service gives
     // up at 60 s, so this only catches a service that never answers.
     timeoutMs: Number(process.env.AI_ASSISTANT_TIMEOUT_MS) || 90_000,
@@ -62,16 +59,12 @@ export const askAssistant = async (
   const started = Date.now();
   let outcome = 'ok';
   try {
-    const res = await fetch(`${config.url}/ask`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-AI-Secret': config.secret,
-        ...(requestId ? { 'X-Request-Id': requestId } : {}),
-      },
-      body: JSON.stringify({ question, history, ...(userToken ? { userToken } : {}) }),
-      signal: AbortSignal.timeout(config.timeoutMs),
-    });
+    const res = await callAiService(
+      config,
+      '/ask',
+      { question, history, ...(userToken ? { userToken } : {}) },
+      { timeoutMs: config.timeoutMs, requestId },
+    );
     if (!res.ok) {
       outcome = `http_${res.status}`;
       throw new AssistantUnavailableError();
@@ -85,7 +78,7 @@ export const askAssistant = async (
     return { answer: body.answer, outcome: body.outcome, toolCalls: body.toolCalls };
   } catch (error) {
     if (error instanceof AssistantUnavailableError) throw error;
-    outcome = (error as Error)?.name === 'TimeoutError' ? 'timeout' : 'network_error';
+    outcome = failureOutcome(error);
     throw new AssistantUnavailableError();
   } finally {
     // Never the question or the answer.

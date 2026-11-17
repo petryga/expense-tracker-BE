@@ -4,7 +4,7 @@ import type { Currency } from '../../models/Expense.js';
 import { ImportBatch } from '../../models/ImportBatch.js';
 import { ImportedTransaction } from '../../models/ImportedTransaction.js';
 import { parseAmex } from '../statementParsers/amex.js';
-import { matchAmazonCharges } from './amazon.js';
+import { matchAmazonCharges } from './amazonMatching.js';
 import { ImportInputError } from './errors.js';
 import { pairRefunds } from './pairing.js';
 import { savedFingerprints } from './savedRows.js';

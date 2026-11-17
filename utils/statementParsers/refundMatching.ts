@@ -6,7 +6,7 @@
 // When several purchases qualify they are interchangeable for the books (same
 // merchant, same amount), so the nearest earlier one is taken. Partial refunds
 // never match, by design: they stay for a person to decide.
-export const MAX_REFUND_DAYS = 180;
+const MAX_REFUND_DAYS = 180;
 
 export interface MatchCandidate {
   id: string;

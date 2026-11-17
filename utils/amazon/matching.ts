@@ -37,7 +37,7 @@ export interface MatchOptions {
   currency: string;
 }
 
-export const WINDOW_DAYS = { before: 3, after: 10 } as const;
+const WINDOW_DAYS = { before: 3, after: 10 } as const;
 
 export const isAmazonCharge = (description: string) => /\b(amazon|amzn)/i.test(description);
 
@@ -50,7 +50,7 @@ const sum = (items: MatchItem[]) => items.reduce((total, item) => total + item.t
 
 // Orders and their shipments as candidate groups; an order shipped at once is
 // one group, not two.
-export const candidateGroups = (items: MatchItem[], options: MatchOptions) => {
+const candidateGroups = (items: MatchItem[], options: MatchOptions) => {
   const brand = options.cardBrand.toLowerCase();
   const usable = items.filter(
     (item) =>

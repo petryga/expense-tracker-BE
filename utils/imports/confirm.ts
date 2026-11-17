@@ -5,7 +5,7 @@ import { ImportedItem } from '../../models/ImportedItem.js';
 import { ImportedTransaction } from '../../models/ImportedTransaction.js';
 import { displayDescription } from '../statementParsers/merchant.js';
 import { centsToAmount } from '../statementParsers/money.js';
-import type { ParseError } from '../statementParsers/types.js';
+import { checkDecisions } from './confirmChecks.js';
 import { ImportInputError } from './errors.js';
 import { unpairItems } from './itemRefundPairing.js';
 import { forgetSaved, recordSaved } from './savedRows.js';
@@ -69,42 +69,7 @@ export const confirmImport = async (
     // Items returned on their own are neither reviewed nor saved.
     const itemsOf = (rowId: string) =>
       items.filter((item) => item.transactionId === rowId && item.status !== 'returned');
-    const problems: ParseError[] = [];
-    decisions.forEach((decision, index) => {
-      const row = rowById.get(decision.id);
-      const where = index + 1;
-      if (!row)
-        return problems.push({ line: where, message: `Row ${decision.id} is not in this import` });
-      if (row.status !== 'draft')
-        return problems.push({ line: where, message: `Row ${decision.id} was already reviewed` });
-      const returnsSavedPurchase =
-        row.kind === 'refund' && (!!row.matchedTransactionId || !!row.matchedItemId);
-      if (decision.action === 'return' && !returnsSavedPurchase)
-        return problems.push({
-          line: where,
-          message: `Row ${decision.id} has no saved purchase to return`,
-        });
-      if (decision.action === 'save' && returnsSavedPurchase)
-        return problems.push({
-          line: where,
-          message: `Row ${decision.id} returns a purchase; choose return or skip`,
-        });
-      const rowItems = itemsOf(row.id);
-      if (decision.action === 'save' && rowItems.length) {
-        const given = new Map((decision.items ?? []).map((item) => [item.id, item]));
-        const complete =
-          given.size === rowItems.length &&
-          rowItems.every((item) => given.get(item.id)?.category?.trim());
-        if (!complete)
-          return problems.push({
-            line: where,
-            message: `Row ${decision.id} needs a category for each of its items`,
-          });
-        return;
-      }
-      if (decision.action === 'save' && !decision.category?.trim())
-        return problems.push({ line: where, message: `Row ${decision.id} needs a category` });
-    });
+    const problems = checkDecisions(decisions, rowById, itemsOf);
     if (problems.length)
       throw new ImportInputError('Some decisions could not be applied', problems);
 

@@ -65,7 +65,7 @@ interface Target {
 }
 
 // Step 1. Returns whether any rows are left for the AI service.
-export const suggestFromMemory = async (userId: string | null, batchId: string) => {
+const suggestFromMemory = async (userId: string | null, batchId: string) => {
   const rows = await draftPurchases(userId, batchId);
   if (!rows.length) return false;
   const memory = await merchantMemory(userId);
@@ -176,11 +176,7 @@ const runAi = async (
   return { job };
 };
 
-export const startAiSuggestions = async (
-  userId: string | null,
-  batchId: string,
-  requestId?: string,
-) =>
+const startAiSuggestions = async (userId: string | null, batchId: string, requestId?: string) =>
   runAi(
     userId,
     await draftPurchases(userId, batchId),

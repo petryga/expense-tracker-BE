@@ -10,7 +10,7 @@ const readConfiguredRate = (): number => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_CAD_TO_USD;
 };
 
-export const getCadToUsdRate = (_year?: number, _month?: number): number => readConfiguredRate();
+const getCadToUsdRate = (_year?: number, _month?: number): number => readConfiguredRate();
 
 export const convertAmount = ({
   amount,

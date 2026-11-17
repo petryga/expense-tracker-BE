@@ -7,7 +7,7 @@ import { handleError } from '../utils/common.js';
 const router = Router();
 
 // "gift", "Gifts", "gif"…: a search that could mean gifts also lists them.
-export const matchesGifts = (search: string) => {
+const matchesGifts = (search: string) => {
   const term = search.trim().toLowerCase();
   return term.length >= 3 && 'gifts'.startsWith(term.replace(/s$/, ''));
 };
