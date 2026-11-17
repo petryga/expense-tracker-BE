@@ -7,6 +7,7 @@ import { ImportedTransaction } from '../models/ImportedTransaction.js';
 import { resetDemoUserData } from '../utils/demoData.js';
 import { pairingHooks } from '../utils/imports/pairing.js';
 import { SavedStatementRow } from '../models/SavedStatementRow.js';
+import { SuggestionOutcome } from '../models/SuggestionOutcome.js';
 import { serveApp, newUser, wipeAll } from './helpers.js';
 
 const app = await serveApp();
@@ -645,6 +646,48 @@ describe('category suggestions: memory now, the AI service in the background', (
     await giveCategories(other);
     const theirs = await upload(other, SEPTEMBER);
     expect(byDesc(theirs.body.rows, 'LENSWORKS')).toMatchObject({ suggestedCategory: null });
+  });
+
+  it('records what was suggested for each saved charge, kept after the import is deleted', async () => {
+    await giveCategories(null as unknown as string);
+    vi.stubEnv('AI_CATEGORIZE_ENABLED', 'false');
+    const sep = await upload(null, SEPTEMBER);
+    await confirm(null, sep.body.id, [
+      { id: byDesc(sep.body.rows, 'LENSWORKS').id, action: 'save', category: 'Eyewear' },
+    ]);
+    const next = await upload(
+      null,
+      csv([
+        ['11/02/2026', 'LENSWORKS OPTICAL SPRINGFIELD', '45.00', "'4501"],
+        ['11/03/2026', 'WHOLE FOODS MKT AUSTIN TX', '30.00', "'4502"],
+        ['11/04/2026', 'STARBUCKS 0123 AUSTIN TX', '5.25', "'4503"],
+      ]),
+    );
+    await confirm(null, next.body.id, [
+      // Memory suggested Eyewear and it was kept.
+      { id: byDesc(next.body.rows, 'LENSWORKS').id, action: 'save', category: 'Eyewear' },
+      // No suggestion; saved anyway.
+      { id: byDesc(next.body.rows, 'WHOLE FOODS').id, action: 'save', category: 'Groceries' },
+      // Skipped: not a purchase the report counts.
+      { id: byDesc(next.body.rows, 'STARBUCKS').id, action: 'skip' },
+    ]);
+    const outcomes = await SuggestionOutcome.findAll({
+      where: { userId: null },
+      order: [['postedDate', 'ASC']],
+    });
+    expect(
+      outcomes.map((o) => [o.kind, o.postedDate, o.suggestedCategory, o.suggestionSource]),
+    ).toEqual([
+      ['statement', '2026-09-12', null, null],
+      ['statement', '2026-11-02', 'Eyewear', 'memory'],
+      ['statement', '2026-11-03', null, null],
+    ]);
+    expect(outcomes.every((o) => o.expenseId)).toBe(true);
+
+    // Deleting an import keeps the record; deleting its expenses is what drops it
+    // from the report (the report needs the expense's category).
+    await as(request(app).delete(`/imports/${next.body.id}?keepExpenses=true`), null);
+    expect(await SuggestionOutcome.count({ where: { userId: null } })).toBe(3);
   });
 
   it("learns a gift's real category: a gift is a checkbox, not a category", async () => {

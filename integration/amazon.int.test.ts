@@ -3,6 +3,7 @@ import request from 'supertest';
 import { Category } from '../models/Category.js';
 import { Expense } from '../models/Expense.js';
 import { ImportedItem } from '../models/ImportedItem.js';
+import { SuggestionOutcome } from '../models/SuggestionOutcome.js';
 import { pastItemChoices } from '../utils/imports/itemExamples.js';
 import { serveApp, newUser, wipeAll } from './helpers.js';
 
@@ -303,6 +304,11 @@ describe('Amazon orders in statement import (real database)', () => {
     expect((await pastItemChoices(user))[0].source).toMatch(/^[0-9a-f-]{36}$/);
     // Someone else never sees them.
     expect(await pastItemChoices(newUser())).toEqual([]);
+
+    // Each item's suggestion is recorded on its own.
+    expect(
+      (await SuggestionOutcome.findAll({ where: { userId: user, kind: 'item' } })).length,
+    ).toBe(2);
 
     // Recategorized later in the app: the new category is the choice.
     await Expense.update({ category: 'Home' }, { where: { userId: user, category: 'Garden' } });

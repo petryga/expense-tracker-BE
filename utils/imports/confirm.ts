@@ -9,6 +9,7 @@ import type { ParseError } from '../statementParsers/types.js';
 import { ImportInputError } from './errors.js';
 import { unpairItems } from './itemRefundPairing.js';
 import { forgetSaved, recordSaved } from './savedRows.js';
+import { recordOutcome } from './suggestionOutcomes.js';
 import { findOwnBatch, lockUser } from './userLock.js';
 
 export type ConfirmAction = 'save' | 'skip' | 'return';
@@ -187,6 +188,19 @@ export const confirmImport = async (
             { transaction },
           );
           await item.update({ category, expenseId }, { transaction });
+          await recordOutcome(
+            {
+              userId,
+              kind: 'item',
+              ref: item.id,
+              postedDate: row.postedDate,
+              suggestedCategory: item.suggestedCategory,
+              suggestionSource: item.suggestionSource,
+              expenseId,
+              importedAt: batch.createdAt,
+            },
+            transaction,
+          );
         }
         await row.update({ status: 'saved' }, { transaction });
         await recordSaved(userId, row, null, transaction);
@@ -212,6 +226,21 @@ export const confirmImport = async (
         );
         await row.update({ status: 'saved', category, expenseId }, { transaction });
         await recordSaved(userId, row, expenseId, transaction);
+        if (row.kind === 'charge') {
+          await recordOutcome(
+            {
+              userId,
+              kind: 'statement',
+              ref: row.fingerprint,
+              postedDate: row.postedDate,
+              suggestedCategory: row.suggestedCategory,
+              suggestionSource: row.suggestionSource,
+              expenseId,
+              importedAt: batch.createdAt,
+            },
+            transaction,
+          );
+        }
         saved += 1;
       }
     }

@@ -62,7 +62,7 @@ export const incomeBody = (overrides: Record<string, unknown> = {}) => ({
 
 export const wipeAll = async () => {
   await sequelize.query(
-    'TRUNCATE expenses, income_entries, categories, category_budgets, accounts, import_batches, imported_transactions, imported_items, amazon_order_items, amazon_refunds, saved_statement_rows RESTART IDENTITY',
+    'TRUNCATE expenses, income_entries, categories, category_budgets, accounts, import_batches, imported_transactions, imported_items, amazon_order_items, amazon_refunds, saved_statement_rows, suggestion_outcomes RESTART IDENTITY',
   );
 };
 

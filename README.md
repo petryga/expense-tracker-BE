@@ -103,6 +103,10 @@ Each new draft purchase gets a suggested category, in two steps (`utils/imports/
 
 Each row reports `suggestedCategory`, `suggestionSource` (`memory` or `model`) and `suggestionStatus` (`pending`, `done`, `none`). Whether something was a gift isn't on the statement, so suggestions never deal with it: a gift is a checkbox you tick on review, and the row keeps its real category.
 
+### Suggested vs confirmed
+
+Every purchase saved on review (a statement charge, or one Amazon item) records what was suggested and by whom (`suggestion_outcomes`; kept when its import is deleted). `npx tsx scripts/suggestion-report.ts [--since YYYY-MM-DD]` compares that with the category the expense has now: per posted month and overall, how many suggestions were kept, changed or missing, split by merchant memory and model, with 95% ranges, and the most common misses. `--since` defaults to the prompt freeze date (see `AI/README.md`), so the numbers are held out. Local only; it reads the database and changes nothing.
+
 ### Spending assistant
 
 `POST /assistant` `{ question, history? }` passes a question to the AI service's `/ask`, with the user's own token, and returns `{ answer, outcome, toolCalls }`; `GET /assistant` says whether it is on. Read-only: it answers from the user's data through the MCP server and changes nothing. Off unless `AI_ASSISTANT_ENABLED=true` (with `AI_SERVICE_URL` and `AI_SHARED_SECRET`), never for the demo user, and at most `AI_ASSISTANT_DAILY_LIMIT` questions a user a day (default 50, in memory). Questions are limited to 500 characters and 20 earlier turns; neither questions nor answers are logged.
