@@ -1,7 +1,7 @@
 import express from 'express';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { resetDailyLimits, takeQuestion } from '../utils/assistant/dailyLimit.js';
+import { resetDailyLimits, takeQuota } from '../utils/dailyLimit.js';
 import { serve } from '../testing/localServer.js';
 import assistant from './assistant.js';
 
@@ -149,13 +149,18 @@ describe('POST /assistant', () => {
   });
 });
 
-describe('takeQuestion', () => {
-  it('counts per user and starts again the next day', () => {
+describe('takeQuota', () => {
+  it('counts per kind and user, takes whole amounts only, and starts again the next day', () => {
     const day1 = new Date('2026-11-17T10:00:00Z');
-    expect(takeQuestion('a', 1, day1)).toBe(true);
-    expect(takeQuestion('a', 1, day1)).toBe(false);
-    expect(takeQuestion('b', 1, day1)).toBe(true);
-    expect(takeQuestion(null, 1, day1)).toBe(true);
-    expect(takeQuestion('a', 1, new Date('2026-11-18T00:00:01Z'))).toBe(true);
+    expect(takeQuota('assistant', 'a', 1, 1, day1)).toBe(true);
+    expect(takeQuota('assistant', 'a', 1, 1, day1)).toBe(false);
+    expect(takeQuota('assistant', 'b', 1, 1, day1)).toBe(true);
+    expect(takeQuota('assistant', null, 1, 1, day1)).toBe(true);
+    expect(takeQuota('categorize', 'a', 1, 1, day1)).toBe(true);
+    expect(takeQuota('assistant', 'a', 1, 1, new Date('2026-11-18T00:00:01Z'))).toBe(true);
+    // 30 rows fit in 50; another 30 would not, and none of them are taken.
+    expect(takeQuota('rows', 'c', 30, 50, day1)).toBe(true);
+    expect(takeQuota('rows', 'c', 30, 50, day1)).toBe(false);
+    expect(takeQuota('rows', 'c', 20, 50, day1)).toBe(true);
   });
 });

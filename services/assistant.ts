@@ -6,7 +6,7 @@ import {
   AssistantUnavailableError,
   type ChatTurn,
 } from '../utils/assistant/client.js';
-import { takeQuestion } from '../utils/assistant/dailyLimit.js';
+import { takeQuota } from '../utils/dailyLimit.js';
 import { handleError } from '../utils/common.js';
 
 // The spending assistant (PLANS.md, Plan 2). Read-only: it answers questions
@@ -49,7 +49,7 @@ router.post('/', async (req, res) => {
       error: `Ask a question of up to ${MAX_QUESTION} characters (history: up to ${MAX_HISTORY} turns)`,
     });
   }
-  if (!takeQuestion(req.userId, config.dailyLimit)) {
+  if (!takeQuota('assistant', req.userId, 1, config.dailyLimit)) {
     return res
       .status(429)
       .json({ error: `That's ${config.dailyLimit} questions today. Try again tomorrow.` });

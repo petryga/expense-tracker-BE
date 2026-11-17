@@ -17,6 +17,7 @@ import assistant from './services/assistant.js';
 import { requireAuth } from './middleware/auth.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { databaseReachable } from './utils/readiness.js';
 
 const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173,http://127.0.0.1:5173')
   .split(',')
@@ -84,6 +85,13 @@ app.use((req, _res, next) => {
 // Unauthenticated on purpose — hosting platforms ping this to check the
 // container is up, before any user has a token to send.
 app.get('/health', (req, res) => res.status(200).json({ status: 'ok' }));
+
+// Also unauthenticated: is the database reachable? 503 while it isn't, with no
+// detail in the response.
+app.get('/ready', async (_req, res) => {
+  if (await databaseReachable()) res.status(200).json({ status: 'ready' });
+  else res.status(503).json({ status: 'unavailable' });
+});
 
 // No login/signup routes live here — Supabase Auth handles authentication
 // directly against Supabase's own API, so there's no auth endpoint on this

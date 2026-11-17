@@ -10,6 +10,11 @@ import { Category } from '../models/Category.js';
 import { CategoryBudget } from '../models/CategoryBudget.js';
 import { ImportBatch } from '../models/ImportBatch.js';
 import { ImportedTransaction } from '../models/ImportedTransaction.js';
+import { ImportedItem } from '../models/ImportedItem.js';
+import { SavedStatementRow } from '../models/SavedStatementRow.js';
+import { SuggestionOutcome } from '../models/SuggestionOutcome.js';
+import { AmazonOrderItem } from '../models/AmazonOrderItem.js';
+import { AmazonRefund } from '../models/AmazonRefund.js';
 
 const USER_ID = 'demo-user-123';
 // resetDemoUserData runs everything inside sequelize.transaction; the
@@ -46,6 +51,11 @@ beforeEach(() => {
   vi.spyOn(CategoryBudget, 'destroy').mockResolvedValue(0);
   vi.spyOn(ImportedTransaction, 'destroy').mockResolvedValue(0);
   vi.spyOn(ImportBatch, 'destroy').mockResolvedValue(0);
+  vi.spyOn(ImportedItem, 'destroy').mockResolvedValue(0);
+  vi.spyOn(SavedStatementRow, 'destroy').mockResolvedValue(0);
+  vi.spyOn(SuggestionOutcome, 'destroy').mockResolvedValue(0);
+  vi.spyOn(AmazonOrderItem, 'destroy').mockResolvedValue(0);
+  vi.spyOn(AmazonRefund, 'destroy').mockResolvedValue(0);
 });
 
 afterEach(() => {
@@ -53,7 +63,7 @@ afterEach(() => {
 });
 
 describe('resetDemoUserData', () => {
-  it('wipes all nine tables scoped to the given userId before reseeding', async () => {
+  it('wipes all fourteen tables scoped to the given userId before reseeding', async () => {
     await resetDemoUserData(USER_ID);
 
     expect(Expense.destroy).toHaveBeenCalledWith({
@@ -89,6 +99,26 @@ describe('resetDemoUserData', () => {
       transaction: FAKE_TRANSACTION,
     });
     expect(ImportBatch.destroy).toHaveBeenCalledWith({
+      where: { userId: USER_ID },
+      transaction: FAKE_TRANSACTION,
+    });
+    expect(ImportedItem.destroy).toHaveBeenCalledWith({
+      where: { userId: USER_ID },
+      transaction: FAKE_TRANSACTION,
+    });
+    expect(SavedStatementRow.destroy).toHaveBeenCalledWith({
+      where: { userId: USER_ID },
+      transaction: FAKE_TRANSACTION,
+    });
+    expect(SuggestionOutcome.destroy).toHaveBeenCalledWith({
+      where: { userId: USER_ID },
+      transaction: FAKE_TRANSACTION,
+    });
+    expect(AmazonOrderItem.destroy).toHaveBeenCalledWith({
+      where: { userId: USER_ID },
+      transaction: FAKE_TRANSACTION,
+    });
+    expect(AmazonRefund.destroy).toHaveBeenCalledWith({
       where: { userId: USER_ID },
       transaction: FAKE_TRANSACTION,
     });

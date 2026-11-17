@@ -26,6 +26,8 @@ export interface ItemExample {
 
 export interface AiConfig extends AiService {
   timeoutMs: number;
+  // Rows a user may send for suggestions per day (AI_CATEGORIZE_DAILY_ROWS).
+  dailyRowLimit: number;
 }
 
 // Off unless explicitly on and fully configured.
@@ -36,7 +38,8 @@ export const aiConfig = (): AiConfig | null => {
   // Suggestions run in the background, so the limit is generous: a local model
   // needs 1-3 minutes for a month of rows, Claude a few seconds.
   const timeoutMs = Number(process.env.AI_TIMEOUT_MS) || 300_000;
-  return { ...service, timeoutMs };
+  const dailyRowLimit = Number(process.env.AI_CATEGORIZE_DAILY_ROWS) || 2000;
+  return { ...service, timeoutMs, dailyRowLimit };
 };
 
 const MAX_ROWS_PER_CALL = 500;

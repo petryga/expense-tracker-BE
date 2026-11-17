@@ -8,6 +8,11 @@ import { Category } from '../models/Category.js';
 import { CategoryBudget } from '../models/CategoryBudget.js';
 import { ImportBatch } from '../models/ImportBatch.js';
 import { ImportedTransaction } from '../models/ImportedTransaction.js';
+import { ImportedItem } from '../models/ImportedItem.js';
+import { SavedStatementRow } from '../models/SavedStatementRow.js';
+import { SuggestionOutcome } from '../models/SuggestionOutcome.js';
+import { AmazonOrderItem } from '../models/AmazonOrderItem.js';
+import { AmazonRefund } from '../models/AmazonRefund.js';
 import { createExpenseObject } from './expensesUtils.js';
 import { createIncomeEntryObject } from './incomeEntriesUtils.js';
 
@@ -105,9 +110,16 @@ export const resetDemoUserData = async (userId: string) => {
     await RecurringExpense.destroy({ where: { userId }, transaction });
     await RecurringIncomeEntry.destroy({ where: { userId }, transaction });
     await Account.destroy({ where: { userId }, transaction });
-    // Sample statement imports: drafts, pairs and the batches themselves.
+    // Sample statement imports: drafts, pairs and the batches themselves, and
+    // everything kept after an import (saved rows, suggestion records), so the
+    // next visitor's sample import offers every row again.
+    await ImportedItem.destroy({ where: { userId }, transaction });
     await ImportedTransaction.destroy({ where: { userId }, transaction });
     await ImportBatch.destroy({ where: { userId }, transaction });
+    await SavedStatementRow.destroy({ where: { userId }, transaction });
+    await SuggestionOutcome.destroy({ where: { userId }, transaction });
+    await AmazonOrderItem.destroy({ where: { userId }, transaction });
+    await AmazonRefund.destroy({ where: { userId }, transaction });
     // Not reseeded here - wiping these personal (isDefault:false) rows
     // just drops the user's owned-category count back to 0, so the next
     // GET /categories call provisions a fresh starter set automatically

@@ -111,3 +111,36 @@ describe('rate limiting switch', () => {
     });
   });
 });
+
+describe('GET /ready', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it('answers 200 when the database is reachable, without a token', async () => {
+    const { sequelize } = await import('./config/database.js');
+    vi.spyOn(sequelize, 'authenticate').mockResolvedValue();
+    const res = await request(await serve(app)).get('/ready');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ status: 'ready' });
+  });
+
+  it('answers 503 with no detail when the database refuses', async () => {
+    const { sequelize } = await import('./config/database.js');
+    vi.spyOn(sequelize, 'authenticate').mockRejectedValue(
+      new Error('connect ECONNREFUSED db.internal:5432 user=app'),
+    );
+    const res = await request(await serve(app)).get('/ready');
+    expect(res.status).toBe(503);
+    expect(res.body).toEqual({ status: 'unavailable' });
+  });
+
+  it('answers 503 when the database does not answer in time', async () => {
+    vi.stubEnv('READY_DB_TIMEOUT_MS', '50');
+    const { sequelize } = await import('./config/database.js');
+    vi.spyOn(sequelize, 'authenticate').mockReturnValue(new Promise(() => {}));
+    const res = await request(await serve(app)).get('/ready');
+    expect(res.status).toBe(503);
+  });
+});

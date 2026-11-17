@@ -5,6 +5,7 @@ import { ImportedTransaction } from '../../models/ImportedTransaction.js';
 import { isDemoUser } from '../importAccess.js';
 import { logger } from '../logger.js';
 import { memoryKey } from '../statementParsers/memoryKey.js';
+import { takeQuota } from '../dailyLimit.js';
 import { aiConfig, requestSuggestions, syncItemExamples } from './aiClient.js';
 import { pastItemChoices } from './itemExamples.js';
 import { merchantMemory } from './merchantMemory.js';
@@ -17,7 +18,7 @@ import { merchantMemory } from './merchantMemory.js';
 
 // The category names a user can pick on review: subcategories they can see
 // (shared defaults plus their own), the same list the FE category picker shows.
-const pickableCategories = async (userId: string | null) => {
+export const pickableCategories = async (userId: string | null) => {
   const visible = await Category.findAll({
     where: { [Op.or]: [{ isDefault: true }, { userId }] },
     attributes: ['name', 'parentCategoryId'],
@@ -87,6 +88,19 @@ const suggestFromMemory = async (userId: string | null, batchId: string) => {
   return left > 0;
 };
 
+// Rows still pending are settled as "no suggestion". Never throws.
+const settleNone = (userId: string | null, rowIds: string[], itemIds: string[]) =>
+  Promise.all([
+    ImportedTransaction.update(
+      { suggestionStatus: 'none' },
+      { where: { userId, id: rowIds, suggestionStatus: 'pending' } },
+    ),
+    ImportedItem.update(
+      { suggestionStatus: 'none' },
+      { where: { userId, id: itemIds, suggestionStatus: 'pending' } },
+    ),
+  ]).catch(() => {});
+
 // Step 2, fire and forget. Marks the targets 'pending' first, so the
 // response the user gets already says suggestions are on their way.
 const runAi = async (
@@ -121,6 +135,13 @@ const runAi = async (
     })),
   ];
   const isItem = new Set(itemIds);
+  // A daily cap on rows sent to the AI service (decision 12). Over it, rows
+  // simply get no suggestion, as when the service is down.
+  if (!takeQuota('categorize', userId, targets.length, config.dailyRowLimit)) {
+    logger.warn({ rows: targets.length, requestId }, 'AI daily row limit reached');
+    await settleNone(userId, rowIds, itemIds);
+    return null;
+  }
 
   const job = (async () => {
     try {
@@ -159,16 +180,7 @@ const runAi = async (
       );
     } finally {
       // Whatever got no answer is settled as "no suggestion".
-      await Promise.all([
-        ImportedTransaction.update(
-          { suggestionStatus: 'none' },
-          { where: { userId, id: rowIds, suggestionStatus: 'pending' } },
-        ),
-        ImportedItem.update(
-          { suggestionStatus: 'none' },
-          { where: { userId, id: itemIds, suggestionStatus: 'pending' } },
-        ),
-      ]).catch(() => {});
+      await settleNone(userId, rowIds, itemIds);
     }
   })();
   // Wrapped: an async function returning a bare promise would make its caller

@@ -8,6 +8,7 @@ import { resetDemoUserData } from '../utils/demoData.js';
 import { pairingHooks } from '../utils/imports/pairing.js';
 import { SavedStatementRow } from '../models/SavedStatementRow.js';
 import { SuggestionOutcome } from '../models/SuggestionOutcome.js';
+import { resetDailyLimits } from '../utils/dailyLimit.js';
 import { serveApp, newUser, wipeAll } from './helpers.js';
 
 const app = await serveApp();
@@ -732,6 +733,32 @@ describe('category suggestions: memory now, the AI service in the background', (
     expect(after.reconciliation.balanced).toBe(true);
   });
 
+  it('stops sending rows to the AI service at the daily row limit', async () => {
+    const user = newUser();
+    await giveCategories(user);
+    vi.stubEnv('AI_CATEGORIZE_DAILY_ROWS', '4');
+    const fetchMock = fakeAi();
+    vi.stubGlobal('fetch', fetchMock);
+    // September has 3 charges to ask about: within the limit.
+    const first = await upload(user, SEPTEMBER);
+    await settled(user, first.body.id);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // Two more would make 5, over the limit of 4: none of them are sent.
+    const next = await upload(
+      user,
+      csv([
+        ['11/02/2026', 'MAPLE HARDWARE SPRINGFIELD', '45.00', "'4601"],
+        ['11/03/2026', 'CORNER BAKERY SPRINGFIELD', '9.00', "'4602"],
+      ]),
+    );
+    const after = await settled(user, next.body.id);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(
+      (after.rows as (Row & { suggestionStatus: string })[]).map((r) => r.suggestionStatus),
+    ).toEqual(['none', 'none']);
+    resetDailyLimits();
+  });
+
   it('ignores a suggested category the user does not have', async () => {
     const user = newUser();
     await giveCategories(user);
@@ -785,6 +812,27 @@ describe('statement import in production (demo and feature flag)', () => {
     expect(statuses).toContain('reward:skipped');
   });
 
+  it('shows the precomputed suggestions on the sample, with no AI service', async () => {
+    // The demo user's starter categories, as the app's first page load provides them.
+    await as(request(app).get('/categories'), demo);
+    const sample = await as(request(app).post('/imports/sample'), demo);
+    const byText = (text: string) =>
+      (
+        sample.body.rows as (Row & {
+          suggestedCategory: string | null;
+          suggestionSource: string | null;
+          suggestionStatus: string | null;
+        })[]
+      ).find((r) => r.kind === 'charge' && r.description.includes(text))!;
+    expect(byText('CONTOSO PHARMACY')).toMatchObject({
+      suggestedCategory: 'Pharmacy',
+      suggestionSource: 'model',
+      suggestionStatus: 'done',
+    });
+    // The marketplace charge: no suggestion, settled.
+    expect(byText('AMAZON')).toMatchObject({ suggestedCategory: null, suggestionStatus: 'none' });
+  });
+
   it('keeps upload off for other accounts unless the feature flag is on', async () => {
     const someone = newUser();
     expect((await upload(someone, SEPTEMBER)).status).toBe(403);
@@ -806,5 +854,25 @@ describe('statement import in production (demo and feature flag)', () => {
     expect(await ImportedTransaction.count({ where: { userId: other } })).toBe(5);
     // And the sample can be loaded again right after.
     expect((await as(request(app).post('/imports/sample'), demo)).status).toBe(201);
+  });
+
+  it('after a reset, the sample offers every row again, even ones saved before', async () => {
+    const first = await as(request(app).post('/imports/sample'), demo);
+    const charge = (first.body.rows as Row[]).find(
+      (r) => r.kind === 'charge' && r.status === 'draft',
+    )!;
+    await confirm(demo, first.body.id, [{ id: charge.id, action: 'save', category: 'Groceries' }]);
+
+    await resetDemoUserData(demo);
+
+    // Nothing from the previous visitor is left behind.
+    expect(await SavedStatementRow.count({ where: { userId: demo } })).toBe(0);
+    expect(await SuggestionOutcome.count({ where: { userId: demo } })).toBe(0);
+    const again = await as(request(app).post('/imports/sample'), demo);
+    expect(again.status).toBe(201);
+    expect(again.body.reconciliation.duplicateCount).toBe(0);
+    expect((again.body.rows as Row[]).map((r) => r.id).length).toBe(
+      (first.body.rows as Row[]).length,
+    );
   });
 });

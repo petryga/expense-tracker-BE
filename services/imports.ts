@@ -10,6 +10,7 @@ import { deleteImport } from '../utils/imports/delete.js';
 import { ImportInputError, ImportNotFoundError } from '../utils/imports/errors.js';
 import { getImport, listImports } from '../utils/imports/read.js';
 import { reopenRows } from '../utils/imports/reopen.js';
+import { applySampleSuggestions } from '../utils/imports/sampleSuggestions.js';
 import { suggestForImport, suggestForItems } from '../utils/imports/suggest.js';
 import { uploadStatement } from '../utils/imports/upload.js';
 
@@ -54,6 +55,7 @@ router.post('/sample', async (req, res) => {
       currency: Currency.USD,
     });
     if (!id) return res.status(200).json({ id: null, rowCount, duplicateCount: rowCount });
+    await applySampleSuggestions(req.userId, id);
     res.status(201).json(await getImport(req.userId, id));
   } catch (error) {
     fail(res, error, 'Failed to import the sample statement');

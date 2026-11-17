@@ -23,7 +23,12 @@ describe('aiConfig', () => {
     vi.stubEnv('AI_SHARED_SECRET', '');
     expect(aiConfig()).toBeNull();
     vi.stubEnv('AI_SHARED_SECRET', 'x');
-    expect(aiConfig()).toEqual({ url: 'http://ai.test', secret: 'x', timeoutMs: 300_000 });
+    expect(aiConfig()).toEqual({
+      url: 'http://ai.test',
+      secret: 'x',
+      timeoutMs: 300_000,
+      dailyRowLimit: 2000,
+    });
     vi.stubEnv('AI_CATEGORIZE_ENABLED', 'false');
     expect(aiConfig()).toBeNull();
   });
