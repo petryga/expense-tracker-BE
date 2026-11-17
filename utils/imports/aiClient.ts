@@ -11,6 +11,16 @@ export interface SuggestionRequestRow {
   text: string;
   amountCents: number;
   bankCategory?: string;
+  // An order item: the text is a product name, and the service shows the
+  // model the user's past choices for similar products.
+  kind?: 'item';
+}
+
+// A past choice: what the user filed a product under.
+export interface ItemExample {
+  source: string;
+  text: string;
+  category: string;
 }
 
 export interface AiConfig {
@@ -66,6 +76,7 @@ export const requestSuggestions = async (
   rows: SuggestionRequestRow[],
   categories: string[],
   requestId: string | undefined,
+  userId: string | null = null,
 ): Promise<Map<string, string>> => {
   const suggestions = new Map<string, string>();
   if (!rows.length || !categories.length) return suggestions;
@@ -83,7 +94,7 @@ export const requestSuggestions = async (
           'X-AI-Secret': config.secret,
           ...(requestId ? { 'X-Request-Id': requestId } : {}),
         },
-        body: JSON.stringify({ rows: batch, categories }),
+        body: JSON.stringify({ rows: batch, categories, userId }),
         signal: AbortSignal.timeout(config.timeoutMs),
       });
       if (!res.ok) {
@@ -113,4 +124,39 @@ export const requestSuggestions = async (
   if (outcome === 'ok') logger.info(log, 'AI suggestions');
   else logger.warn(log, 'AI suggestions unavailable; importing without them');
   return outcome === 'ok' ? suggestions : new Map();
+};
+
+const MAX_EXAMPLES = 5000;
+
+// Sends every past item choice of the user, so the service's stored set
+// matches what the app holds now (edits and deletions included). Never
+// throws: without it, items are simply suggested without examples.
+export const syncItemExamples = async (
+  config: AiConfig,
+  userId: string | null,
+  examples: ItemExample[],
+  requestId: string | undefined,
+): Promise<boolean> => {
+  const started = Date.now();
+  let outcome: Outcome = 'ok';
+  try {
+    const res = await fetch(`${config.url}/examples`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-AI-Secret': config.secret,
+        ...(requestId ? { 'X-Request-Id': requestId } : {}),
+      },
+      body: JSON.stringify({ userId, examples: examples.slice(0, MAX_EXAMPLES) }),
+      signal: AbortSignal.timeout(config.timeoutMs),
+    });
+    if (!res.ok) outcome = 'http_error';
+  } catch (error) {
+    outcome = (error as Error)?.name === 'TimeoutError' ? 'timeout' : 'network_error';
+  }
+  // Counts and timing only.
+  const log = { outcome, examples: examples.length, ms: Date.now() - started, requestId };
+  if (outcome === 'ok') logger.info(log, 'AI examples synced');
+  else logger.warn(log, 'AI examples not synced; suggesting without them');
+  return outcome === 'ok';
 };

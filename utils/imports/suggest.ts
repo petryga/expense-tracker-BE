@@ -5,7 +5,8 @@ import { ImportedTransaction } from '../../models/ImportedTransaction.js';
 import { isDemoUser } from '../importAccess.js';
 import { logger } from '../logger.js';
 import { memoryKey } from '../statementParsers/memoryKey.js';
-import { aiConfig, requestSuggestions } from './aiClient.js';
+import { aiConfig, requestSuggestions, syncItemExamples } from './aiClient.js';
+import { pastItemChoices } from './itemExamples.js';
 import { merchantMemory } from './merchantMemory.js';
 
 // Suggestions for a fresh import, in two steps (PLANS.md, Phase B):
@@ -60,6 +61,7 @@ interface Target {
   text: string;
   amountCents: number;
   bankCategory?: string;
+  kind?: 'item';
 }
 
 // Step 1. Returns whether any rows are left for the AI service.
@@ -115,17 +117,24 @@ const runAi = async (
       id: i.id,
       text: i.description.slice(0, 512),
       amountCents: i.amountCents,
+      kind: 'item' as const,
     })),
   ];
   const isItem = new Set(itemIds);
 
   const job = (async () => {
     try {
+      // Items are suggested with the user's past choices for similar
+      // products, so the service gets the current set of those first.
+      if (items.length) {
+        await syncItemExamples(config, userId, await pastItemChoices(userId), requestId);
+      }
       const suggestions = await requestSuggestions(
         config,
         targets,
         await pickableCategories(userId),
         requestId,
+        userId,
       );
       const values = {
         suggestedCategory: null as string | null,

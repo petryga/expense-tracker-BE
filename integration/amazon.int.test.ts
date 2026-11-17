@@ -3,6 +3,7 @@ import request from 'supertest';
 import { Category } from '../models/Category.js';
 import { Expense } from '../models/Expense.js';
 import { ImportedItem } from '../models/ImportedItem.js';
+import { pastItemChoices } from '../utils/imports/itemExamples.js';
 import { buildApp, newUser, wipeAll } from './helpers.js';
 
 const app = buildApp();
@@ -223,7 +224,8 @@ describe('Amazon orders in statement import (real database)', () => {
     vi.stubEnv('AI_CATEGORIZE_ENABLED', 'true');
     vi.stubEnv('AI_SERVICE_URL', 'http://ai.test');
     vi.stubEnv('AI_SHARED_SECRET', 'test');
-    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      if (url.endsWith('/examples')) return new Response('{}');
       const { rows } = JSON.parse(init.body as string) as { rows: { id: string; text: string }[] };
       return new Response(
         JSON.stringify({
@@ -247,15 +249,66 @@ describe('Amazon orders in statement import (real database)', () => {
       })[];
       if (items.every((item) => item.suggestionStatus !== 'pending')) {
         expect(items.map((item) => item.suggestedCategory)).toEqual(['Garden', null]);
-        const sent = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
-          .rows as { text: string }[];
+        const bodies = fetchMock.mock.calls.map(([url, init]) => ({
+          url,
+          ...JSON.parse(init.body as string),
+        }));
+        const asked = bodies.find((b) => b.url.endsWith('/categorize'));
+        const sent = asked.rows as { text: string; kind?: string }[];
         expect(sent.map((r) => r.text)).toContain('Test Phone Cable 2m');
         expect(sent.map((r) => r.text)).not.toContain('AMAZON MKTPL*TEST0001 SEATTLE WA');
+        // Items (not statement rows) are marked as items, and asked for
+        // this user after the service got their past choices (none yet).
+        expect(sent.map((r) => r.kind === 'item')).toEqual(
+          sent.map((r) => r.text.startsWith('Test ')),
+        );
+        expect(asked.userId).toBe(user);
+        expect(bodies[0]).toMatchObject({ userId: user, examples: [] });
+        expect(bodies[0].url.endsWith('/examples')).toBe(true);
         return;
       }
       await new Promise((resolve) => setTimeout(resolve, 20));
     }
     throw new Error('suggestions never settled');
+  });
+
+  it('offers saved items as past choices, following later edits and deletions', async () => {
+    const user = newUser();
+    await uploadOrders(user);
+    const { body } = await uploadStatement(user);
+    const split = rowOf(body, 'TEST0001');
+    expect(await pastItemChoices(user)).toEqual([]);
+
+    await as(request(app).post(`/imports/${body.id}/confirm`), user).send({
+      rows: [
+        {
+          id: split.id,
+          action: 'save',
+          items: [
+            { id: split.items[0].id, category: 'Garden', description: 'Nozzle' },
+            { id: split.items[1].id, category: 'Electronics' },
+          ],
+        },
+      ],
+    });
+    const choices = async () =>
+      (await pastItemChoices(user)).map(({ text, category }) => ({ text, category }));
+    // The product name, not the shortened description the expense got.
+    expect(await choices()).toEqual(
+      expect.arrayContaining([
+        { text: 'Test Garden Hose Nozzle, Brass', category: 'Garden' },
+        { text: 'Test Phone Cable 2m', category: 'Electronics' },
+      ]),
+    );
+    expect((await pastItemChoices(user))[0].source).toMatch(/^[0-9a-f-]{36}$/);
+    // Someone else never sees them.
+    expect(await pastItemChoices(newUser())).toEqual([]);
+
+    // Recategorized later in the app: the new category is the choice.
+    await Expense.update({ category: 'Home' }, { where: { userId: user, category: 'Garden' } });
+    // Deleted later: no longer a choice.
+    await Expense.destroy({ where: { userId: user, category: 'Electronics' } });
+    expect(await choices()).toEqual([{ text: 'Test Garden Hose Nozzle, Brass', category: 'Home' }]);
   });
 
   describe('refunds of single items', () => {

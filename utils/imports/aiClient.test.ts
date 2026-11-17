@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { aiConfig, requestSuggestions, validateSuggestions } from './aiClient.js';
+import { aiConfig, requestSuggestions, syncItemExamples, validateSuggestions } from './aiClient.js';
 
 const CONFIG = { url: 'http://ai.test', secret: 's3cret', timeoutMs: 50 };
 const ROWS = [
@@ -45,7 +45,11 @@ describe('requestSuggestions', () => {
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('http://ai.test/categorize');
     expect(init.headers).toMatchObject({ 'X-AI-Secret': 's3cret', 'X-Request-Id': 'req-1' });
-    expect(JSON.parse(init.body as string)).toEqual({ rows: ROWS, categories: CATEGORIES });
+    expect(JSON.parse(init.body as string)).toEqual({
+      rows: ROWS,
+      categories: CATEGORIES,
+      userId: null,
+    });
   });
 
   it('drops a category the user does not have', async () => {
@@ -87,6 +91,39 @@ describe('requestSuggestions', () => {
     await requestSuggestions(CONFIG, [], CATEGORIES, undefined);
     await requestSuggestions(CONFIG, ROWS, [], undefined);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('syncItemExamples', () => {
+  const EXAMPLES = [{ source: 'i1', text: 'Test Garden Hose', category: 'Garden' }];
+
+  it('sends the user and their past choices, and passes the user on when asking', async () => {
+    const fetchMock = answer({ stored: 1, embedded: 1, removed: 0 });
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect(await syncItemExamples(CONFIG, 'user-1', EXAMPLES, 'req-1')).toBe(true);
+
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('http://ai.test/examples');
+    expect(init.method).toBe('PUT');
+    expect(init.headers).toMatchObject({ 'X-AI-Secret': 's3cret', 'X-Request-Id': 'req-1' });
+    expect(JSON.parse(init.body as string)).toEqual({ userId: 'user-1', examples: EXAMPLES });
+
+    const ask = answer({ suggestions: [] });
+    vi.stubGlobal('fetch', ask);
+    await requestSuggestions(CONFIG, [{ ...ROWS[0], kind: 'item' }], CATEGORIES, undefined, 'u');
+    const sent = JSON.parse(
+      (ask.mock.calls[0] as unknown as [string, RequestInit])[1].body as string,
+    );
+    expect(sent).toMatchObject({ userId: 'u', rows: [{ id: 'a', kind: 'item' }] });
+  });
+
+  it.each([
+    ['an HTTP error', () => answer({ detail: 'retrieval is not configured' }, 503)],
+    ['a network error', () => vi.fn(async () => Promise.reject(new TypeError('fetch failed')))],
+  ])('reports failure on %s without throwing', async (_name, make) => {
+    vi.stubGlobal('fetch', make());
+    await expect(syncItemExamples(CONFIG, null, EXAMPLES, undefined)).resolves.toBe(false);
   });
 });
 
