@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { Category } from '../models/Category.js';
-import { buildApp, newUser, wipeAll } from './helpers.js';
+import { serveApp, newUser, wipeAll } from './helpers.js';
 
-const app = buildApp();
+const app = await serveApp();
 const get = (user: string | null) => {
   const req = request(app).get('/categories');
   return user ? req.set('x-test-user', user) : req;

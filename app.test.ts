@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { listenLocal, serve, stopServer } from './testing/localServer.js';
 
 // FRONTEND_URL is read at module load time, so it must be set before the
 // first import of ./app.js anywhere in the process.
@@ -16,7 +16,7 @@ describe('trust proxy', () => {
   });
 
   it('does not choke on X-Forwarded-For now that trust proxy is configured', async () => {
-    const res = await request(app)
+    const res = await request(await serve(app))
       .get('/health')
       .set('Origin', 'https://myapp.vercel.app')
       .set('X-Forwarded-For', '203.0.113.5');
@@ -27,7 +27,7 @@ describe('trust proxy', () => {
 
 describe('security headers', () => {
   it('applies helmet defaults (e.g. nosniff, no framing) to every response', async () => {
-    const res = await request(app).get('/health');
+    const res = await request(await serve(app)).get('/health');
 
     expect(res.headers['x-content-type-options']).toBe('nosniff');
     expect(res.headers['x-frame-options']).toBe('SAMEORIGIN');
@@ -36,14 +36,18 @@ describe('security headers', () => {
 
 describe('CORS', () => {
   it('allows the configured FRONTEND_URL origin', async () => {
-    const res = await request(app).get('/health').set('Origin', 'https://myapp.vercel.app');
+    const res = await request(await serve(app))
+      .get('/health')
+      .set('Origin', 'https://myapp.vercel.app');
 
     expect(res.status).toBe(200);
     expect(res.headers['access-control-allow-origin']).toBe('https://myapp.vercel.app');
   });
 
   it('rejects any other origin with a clean 403 instead of leaking a stack trace', async () => {
-    const res = await request(app).get('/health').set('Origin', 'https://evil.example.com');
+    const res = await request(await serve(app))
+      .get('/health')
+      .set('Origin', 'https://evil.example.com');
 
     expect(res.status).toBe(403);
     expect(res.body).toEqual({ error: 'Not allowed by CORS' });
@@ -51,25 +55,20 @@ describe('CORS', () => {
   });
 
   it('allows requests with no Origin header (curl, server-to-server, health checks)', async () => {
-    const res = await request(app).get('/health');
+    const res = await request(await serve(app)).get('/health');
 
     expect(res.status).toBe(200);
   });
 });
 
-// One server per test, on 127.0.0.1, for all of its requests. `request(app)`
-// starts a new server on a new port for every request; at 100+ requests,
-// with other test runs doing the same, a freed port could be reused by
-// another process's server and a request would land on the wrong app (a stray
-// 404, or a 200 counted by someone else's limiter).
+// One 127.0.0.1 server per test for all of its requests (see
+// testing/localServer.ts); the limiter tests send 100+.
 const withServer = async (testApp: express.Express, run: (url: string) => Promise<void>) => {
-  const server = await new Promise<Server>((resolve) => {
-    const s = testApp.listen(0, '127.0.0.1', () => resolve(s));
-  });
+  const server = await listenLocal(testApp);
   try {
     await run(`http://127.0.0.1:${(server.address() as AddressInfo).port}`);
   } finally {
-    await new Promise((resolve) => server.close(resolve));
+    await stopServer(server);
   }
 };
 

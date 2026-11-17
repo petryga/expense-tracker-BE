@@ -5,11 +5,13 @@ import { ImportedItem } from '../../models/ImportedItem.js';
 import { ImportedTransaction } from '../../models/ImportedTransaction.js';
 import { unpairItems } from './itemRefundPairing.js';
 import { pairRefunds } from './pairing.js';
+import { forgetSaved } from './savedRows.js';
 import { findOwnBatch, lockUser } from './userLock.js';
 
 // Deleting an import removes its rows. The expenses it saved that still exist
-// are deleted too unless keepExpenses is set; kept ones become ordinary
-// expenses (uploading the same file again would then offer those rows anew).
+// are deleted too unless keepExpenses is set. Kept ones stay on record as
+// saved rows (savedRows.ts), so merchant memory keeps them and uploading the
+// same file again doesn't offer them anew; deleted ones are forgotten.
 // Rows in other imports that were paired with one of its rows are unpaired,
 // then pairing runs again over what is left.
 export const deleteImport = async (
@@ -22,7 +24,7 @@ export const deleteImport = async (
     const batch = await findOwnBatch(userId, batchId, transaction);
     const rows = await ImportedTransaction.findAll({
       where: { batchId, userId },
-      attributes: ['id', 'expenseId'],
+      attributes: ['id', 'expenseId', 'fingerprint'],
       transaction,
     });
     const ids = rows.map((r) => r.id);
@@ -39,6 +41,12 @@ export const deleteImport = async (
       !keepExpenses && expenseIds.length
         ? await Expense.destroy({ where: { id: expenseIds, userId }, transaction })
         : 0;
+    if (!keepExpenses)
+      await forgetSaved(
+        userId,
+        rows.map((r) => r.fingerprint),
+        transaction,
+      );
 
     const partners = await ImportedTransaction.findAll({
       where: { userId, matchedTransactionId: ids, batchId: { [Op.ne]: batchId } },

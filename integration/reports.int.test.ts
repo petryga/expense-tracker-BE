@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
-import { buildApp, expenseBody, incomeBody, newUser, wipeAll } from './helpers.js';
+import { serveApp, expenseBody, incomeBody, newUser, wipeAll } from './helpers.js';
 
-const app = buildApp();
+const app = await serveApp();
 const as = (user: string) => ({
   get: (path: string) => request(app).get(path).set('x-test-user', user),
   post: (path: string, body: unknown) =>

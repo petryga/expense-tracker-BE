@@ -8,6 +8,7 @@ import { centsToAmount } from '../statementParsers/money.js';
 import type { ParseError } from '../statementParsers/types.js';
 import { ImportInputError } from './errors.js';
 import { unpairItems } from './itemRefundPairing.js';
+import { forgetSaved, recordSaved } from './savedRows.js';
 import { findOwnBatch, lockUser } from './userLock.js';
 
 export type ConfirmAction = 'save' | 'skip' | 'return';
@@ -161,6 +162,7 @@ export const confirmImport = async (
           );
         }
         await purchase?.update({ status: 'returned', expenseId: null }, { transaction });
+        if (purchase) await forgetSaved(userId, [purchase.fingerprint], transaction);
         await row.update({ status: 'returned' }, { transaction });
         returned += 1;
       } else if (itemsOf(row.id).length) {
@@ -187,6 +189,7 @@ export const confirmImport = async (
           await item.update({ category, expenseId }, { transaction });
         }
         await row.update({ status: 'saved' }, { transaction });
+        await recordSaved(userId, row, null, transaction);
         saved += 1;
       } else {
         const category = decision.category!.trim();
@@ -208,6 +211,7 @@ export const confirmImport = async (
           { transaction },
         );
         await row.update({ status: 'saved', category, expenseId }, { transaction });
+        await recordSaved(userId, row, expenseId, transaction);
         saved += 1;
       }
     }

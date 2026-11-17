@@ -15,5 +15,12 @@
     "noErrorTruncation": true,
     "plugins": []
   },
-  "exclude": ["node_modules", "dist", "integration", "vitest.integration.config.ts", "**/*.test.ts"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "integration",
+    "testing",
+    "vitest.integration.config.ts",
+    "**/*.test.ts"
+  ]
 }

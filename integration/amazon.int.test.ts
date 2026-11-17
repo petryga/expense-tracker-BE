@@ -4,9 +4,9 @@ import { Category } from '../models/Category.js';
 import { Expense } from '../models/Expense.js';
 import { ImportedItem } from '../models/ImportedItem.js';
 import { pastItemChoices } from '../utils/imports/itemExamples.js';
-import { buildApp, newUser, wipeAll } from './helpers.js';
+import { serveApp, newUser, wipeAll } from './helpers.js';
 
-const app = buildApp();
+const app = await serveApp();
 
 // Invented statement and order history (PLANS.md, Phase D).
 const statement = (rows: [string, string, string, string][]) =>

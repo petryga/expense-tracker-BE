@@ -6,9 +6,10 @@ import { ImportBatch } from '../models/ImportBatch.js';
 import { ImportedTransaction } from '../models/ImportedTransaction.js';
 import { resetDemoUserData } from '../utils/demoData.js';
 import { pairingHooks } from '../utils/imports/pairing.js';
-import { buildApp, newUser, wipeAll } from './helpers.js';
+import { SavedStatementRow } from '../models/SavedStatementRow.js';
+import { serveApp, newUser, wipeAll } from './helpers.js';
 
-const app = buildApp();
+const app = await serveApp();
 
 // Synthetic statements. Each row has a Reference, like the real extended export.
 const csv = (rows: [string, string, string, string][]) =>
@@ -549,6 +550,101 @@ describe('category suggestions: memory now, the AI service in the background', (
       suggestionSource: 'memory',
     });
     expect(byDesc(res.body.rows, 'WHOLE FOODS')).toMatchObject({ suggestedCategory: null });
+  });
+
+  it('keeps what it learned, and offers nothing saved, after an import is deleted', async () => {
+    const user = newUser();
+    await giveCategories(user);
+    vi.stubEnv('AI_CATEGORIZE_ENABLED', 'false');
+    const sep = await upload(user, SEPTEMBER);
+    await confirm(user, sep.body.id, [
+      { id: byDesc(sep.body.rows, 'LENSWORKS').id, action: 'save', category: 'Eyewear' },
+    ]);
+    await as(request(app).delete(`/imports/${sep.body.id}?keepExpenses=true`), user);
+
+    // The same file again: the saved row is not offered; the rest are.
+    const again = await upload(user, SEPTEMBER);
+    expect(again.body.reconciliation).toMatchObject({ duplicateCount: 1, balanced: true });
+    expect(again.body.rows.some((r: Row) => r.description.includes('LENSWORKS'))).toBe(false);
+    expect(await Expense.count({ where: { userId: user } })).toBe(1);
+
+    // And memory still knows the shop.
+    const next = await upload(
+      user,
+      csv([['11/02/2026', 'LENSWORKS OPTICAL SPRINGFIELD', '45.00', "'4201"]]),
+    );
+    expect(next.body.rows[0]).toMatchObject({
+      suggestedCategory: 'Eyewear',
+      suggestionSource: 'memory',
+    });
+  });
+
+  it('forgets rows whose import was deleted with its expenses', async () => {
+    const user = newUser();
+    await giveCategories(user);
+    vi.stubEnv('AI_CATEGORIZE_ENABLED', 'false');
+    const sep = await upload(user, SEPTEMBER);
+    await confirm(user, sep.body.id, [
+      { id: byDesc(sep.body.rows, 'LENSWORKS').id, action: 'save', category: 'Eyewear' },
+    ]);
+    await as(request(app).delete(`/imports/${sep.body.id}`), user);
+
+    const again = await upload(user, SEPTEMBER);
+    expect(again.body.reconciliation.duplicateCount).toBe(0);
+    expect(byDesc(again.body.rows, 'LENSWORKS')).toMatchObject({ suggestedCategory: null });
+  });
+
+  it('never remembers a general marketplace', async () => {
+    const user = newUser();
+    await giveCategories(user);
+    vi.stubEnv('AI_CATEGORIZE_ENABLED', 'false');
+    const sep = await upload(user, SEPTEMBER);
+    await confirm(user, sep.body.id, [
+      { id: byDesc(sep.body.rows, 'AMAZON').id, action: 'save', category: 'Groceries' },
+    ]);
+    const next = await upload(user, csv([['11/02/2026', 'AMAZON.COM*ZZ99Q', '9.99', "'4301"]]));
+    expect(next.body.rows[0]).toMatchObject({ suggestedCategory: null });
+  });
+
+  it('forgets a purchase returned by a later refund, so it can be imported again', async () => {
+    const user = newUser();
+    await giveCategories(user);
+    vi.stubEnv('AI_CATEGORIZE_ENABLED', 'false');
+    const sep = await upload(user, SEPTEMBER);
+    await confirm(user, sep.body.id, [
+      { id: byDesc(sep.body.rows, 'WHOLE FOODS').id, action: 'save', category: 'Groceries' },
+    ]);
+    const refund = await upload(
+      user,
+      csv([['09/25/2026', 'WHOLE FOODS MKT AUSTIN TX', '-82.10', "'4401"]]),
+    );
+    await confirm(user, refund.body.id, [{ id: refund.body.rows[0].id, action: 'return' }]);
+    expect(await SavedStatementRow.count({ where: { userId: user } })).toBe(0);
+  });
+
+  it('uses rows loaded from the labelled set, which never count as duplicates', async () => {
+    await giveCategories(null as unknown as string);
+    vi.stubEnv('AI_CATEGORIZE_ENABLED', 'false');
+    await SavedStatementRow.create({
+      userId: null,
+      fingerprint: 'label:1003',
+      description: 'LENSWORKS OPTICAL SPRINGFIELD',
+      kind: 'charge',
+      category: 'Eyewear',
+      source: 'label',
+      chosenAt: new Date('2026-09-12'),
+    });
+    const sep = await upload(null, SEPTEMBER);
+    expect(sep.body.reconciliation.duplicateCount).toBe(0);
+    expect(byDesc(sep.body.rows, 'LENSWORKS')).toMatchObject({
+      suggestedCategory: 'Eyewear',
+      suggestionSource: 'memory',
+    });
+    // Another user learns nothing from it.
+    const other = newUser();
+    await giveCategories(other);
+    const theirs = await upload(other, SEPTEMBER);
+    expect(byDesc(theirs.body.rows, 'LENSWORKS')).toMatchObject({ suggestedCategory: null });
   });
 
   it("learns a gift's real category: a gift is a checkbox, not a category", async () => {

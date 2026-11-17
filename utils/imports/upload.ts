@@ -7,10 +7,12 @@ import { parseAmex } from '../statementParsers/amex.js';
 import { matchAmazonCharges } from './amazon.js';
 import { ImportInputError } from './errors.js';
 import { pairRefunds } from './pairing.js';
+import { savedFingerprints } from './savedRows.js';
 import { lockUser } from './userLock.js';
 
 // Parses a statement and stores every row as part of a new import. Rows seen
-// in an earlier upload are counted as duplicates, not stored again.
+// in an earlier upload are counted as duplicates, not stored again, and so are
+// rows saved as expenses by an import since deleted.
 export interface UploadInput {
   fileName: string;
   csv: string;
@@ -38,25 +40,32 @@ export const uploadStatement = async (userId: string | null, input: UploadInput)
       { transaction },
     );
 
+    const savedBefore = await savedFingerprints(
+      userId,
+      parsed.transactions.map((t) => t.fingerprint),
+      transaction,
+    );
     // ON CONFLICT DO NOTHING on (user_id, fingerprint): rows already imported
     // from an earlier, overlapping file are left where they are.
     await ImportedTransaction.bulkCreate(
-      parsed.transactions.map((t) => ({
-        id: randomUUID(),
-        userId,
-        batchId: batch.id,
-        line: t.line,
-        fingerprint: t.fingerprint,
-        reference: t.reference,
-        postedDate: t.postedDate,
-        description: t.description.slice(0, 512),
-        merchantKey: t.merchantKey,
-        amountCents: t.amountCents,
-        raw: t.raw,
-        kind: t.kind,
-        // Card payments and reward credits are never expenses.
-        status: t.kind === 'payment' || t.kind === 'reward' ? 'skipped' : 'draft',
-      })),
+      parsed.transactions
+        .filter((t) => !savedBefore.has(t.fingerprint))
+        .map((t) => ({
+          id: randomUUID(),
+          userId,
+          batchId: batch.id,
+          line: t.line,
+          fingerprint: t.fingerprint,
+          reference: t.reference,
+          postedDate: t.postedDate,
+          description: t.description.slice(0, 512),
+          merchantKey: t.merchantKey,
+          amountCents: t.amountCents,
+          raw: t.raw,
+          kind: t.kind,
+          // Card payments and reward credits are never expenses.
+          status: t.kind === 'payment' || t.kind === 'reward' ? 'skipped' : 'draft',
+        })),
       { transaction, ignoreDuplicates: true },
     );
 
