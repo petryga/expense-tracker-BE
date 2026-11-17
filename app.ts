@@ -13,6 +13,7 @@ import categories from './services/categories.js';
 import accounts from './services/accounts.js';
 import demo from './services/demo.js';
 import imports from './services/imports.js';
+import assistant from './services/assistant.js';
 import { requireAuth } from './middleware/auth.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -104,5 +105,6 @@ app.use('/categories', categories);
 app.use('/accounts', accounts);
 app.use('/demo', demo);
 app.use('/imports', imports);
+app.use('/assistant', assistant);
 
 app.use(errorHandler);

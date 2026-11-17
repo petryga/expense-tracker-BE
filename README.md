@@ -103,6 +103,10 @@ Each new draft purchase gets a suggested category, in two steps (`utils/imports/
 
 Each row reports `suggestedCategory`, `suggestionSource` (`memory` or `model`) and `suggestionStatus` (`pending`, `done`, `none`). Whether something was a gift isn't on the statement, so suggestions never deal with it: a gift is a checkbox you tick on review, and the row keeps its real category.
 
+### Spending assistant
+
+`POST /assistant` `{ question, history? }` passes a question to the AI service's `/ask`, with the user's own token, and returns `{ answer, outcome, toolCalls }`; `GET /assistant` says whether it is on. Read-only: it answers from the user's data through the MCP server and changes nothing. Off unless `AI_ASSISTANT_ENABLED=true` (with `AI_SERVICE_URL` and `AI_SHARED_SECRET`), never for the demo user, and at most `AI_ASSISTANT_DAILY_LIMIT` questions a user a day (default 50, in memory). Questions are limited to 500 characters and 20 earlier turns; neither questions nor answers are logged.
+
 ## Logging
 
 - One JSON line per request (pino-http): request id, method, path (no query string), status, duration, `userId`. Level from `LOG_LEVEL`; `LOG_PRETTY=true` for readable local output.
