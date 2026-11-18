@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { Op } from 'sequelize';
+import { Op, type Transaction } from 'sequelize';
 import { sequelize } from '../../config/database.js';
 import { AmazonOrderItem } from '../../models/AmazonOrderItem.js';
 import { AmazonRefund } from '../../models/AmazonRefund.js';
 import { ImportedItem } from '../../models/ImportedItem.js';
-import { parseOrderHistory } from '../amazon/orderHistory.js';
+import { parseOrderHistory, type OrderItem } from '../amazon/orderHistory.js';
 import { parseRefundDetails, REFUND_COLUMNS } from '../amazon/refundDetails.js';
 import { matchAmazonCharges } from './amazonMatching.js';
 import { ImportInputError } from './errors.js';
@@ -47,6 +47,47 @@ const uploadAmazonRefunds = async (userId: string | null, csv: string) => {
   });
 };
 
+// An export taken before an order shipped lists its items with no ship date;
+// a later export lists them again with one, and the ship date is part of the
+// fingerprint, so both copies would be stored and the charge would offer the
+// same order twice. Once an upload has the shipped item, the earlier unshipped
+// copy goes, unless this upload still lists it (an identical item not shipped
+// yet) or a charge was already split from it.
+const sameItem = (item: { orderId: string; asin: string; totalCents: number }) =>
+  `${item.orderId}|${item.asin}|${item.totalCents}`;
+
+const dropUnshippedCopies = async (
+  userId: string | null,
+  uploaded: OrderItem[],
+  transaction: Transaction,
+) => {
+  const shipped = uploaded.filter((item) => item.shipDate);
+  if (!shipped.length) return;
+  const shippedItems = new Set(shipped.map(sameItem));
+  const inThisUpload = new Set(uploaded.map((item) => item.fingerprint));
+  const unshipped = await AmazonOrderItem.findAll({
+    where: { userId, shipDate: null, orderId: [...new Set(shipped.map((item) => item.orderId))] },
+    transaction,
+  });
+  const candidates = unshipped.filter(
+    (item) => shippedItems.has(sameItem(item)) && !inThisUpload.has(item.fingerprint),
+  );
+  if (!candidates.length) return;
+  const splitFrom = new Set(
+    (
+      await ImportedItem.findAll({
+        where: { orderItemId: candidates.map((item) => item.id) },
+        attributes: ['orderItemId'],
+        transaction,
+      })
+    ).map((item) => item.orderItemId),
+  );
+  const stale = candidates.filter((item) => !splitFrom.has(item.id));
+  if (stale.length) {
+    await AmazonOrderItem.destroy({ where: { id: stale.map((item) => item.id) }, transaction });
+  }
+};
+
 // Stores a new order history upload (items seen before are kept as they are)
 // and matches open charges against it.
 const uploadAmazonOrders = async (userId: string | null, csv: string) => {
@@ -59,6 +100,8 @@ const uploadAmazonOrders = async (userId: string | null, csv: string) => {
       parsed.items.map((item) => ({ id: randomUUID(), userId, ...item })),
       { transaction, ignoreDuplicates: true },
     );
+    const added = (await AmazonOrderItem.count({ where: { userId }, transaction })) - before;
+    await dropUnshippedCopies(userId, parsed.items, transaction);
     const itemCount = await AmazonOrderItem.count({ where: { userId }, transaction });
     const newItemIds = await matchAmazonCharges(userId, transaction);
     const matchedCount = newItemIds.length
@@ -73,7 +116,7 @@ const uploadAmazonOrders = async (userId: string | null, csv: string) => {
     return {
       kind: 'orders' as const,
       itemCount,
-      newItemCount: itemCount - before,
+      newItemCount: added,
       matchedCount,
       newItemIds,
     };

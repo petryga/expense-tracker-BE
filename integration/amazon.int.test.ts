@@ -98,6 +98,123 @@ afterEach(() => {
 });
 
 describe('Amazon orders in statement import (real database)', () => {
+  it('replaces items exported before shipping with the shipped ones from a later export', async () => {
+    const user = newUser();
+    const row = (ship: string, status: string, total: string, asin: string, name: string) =>
+      [
+        '111-0000001-0000001',
+        '2026-03-03T10:00:00Z',
+        ship,
+        'USD',
+        total,
+        asin,
+        'AmericanExpress - 0001',
+        status,
+        name,
+        '1',
+        '1 Test St',
+      ]
+        .map((v) => `"${v}"`)
+        .join(',');
+    const beforeShipping = [
+      ORDER_HEADER,
+      row('Not Available', 'New', '12.50', 'B0TEST0001', 'Test Garden Hose Nozzle, Brass'),
+      row('Not Available', 'New', '4.99', 'B0TEST0002', 'Test Phone Cable 2m'),
+    ].join('\n');
+    const afterShipping = [
+      ORDER_HEADER,
+      row(
+        '2026-03-03T12:00:00Z',
+        'Closed',
+        '12.50',
+        'B0TEST0001',
+        'Test Garden Hose Nozzle, Brass',
+      ),
+      row('2026-03-03T12:00:00Z', 'Closed', '4.99', 'B0TEST0002', 'Test Phone Cable 2m'),
+    ].join('\n');
+
+    await as(request(app).post('/imports/amazon'), user).send({ csv: beforeShipping });
+    const second = await as(request(app).post('/imports/amazon'), user).send({
+      csv: afterShipping,
+    });
+    expect(second.body).toMatchObject({ itemCount: 2, newItemCount: 2 });
+
+    const res = await uploadStatement(user);
+    const split = rowOf(res.body, 'TEST0001');
+    expect(split.amazonStatus).toBe('matched');
+    expect(split.items.map((i) => [i.description, i.amountCents])).toEqual([
+      ['Test Garden Hose Nozzle, Brass', 1250],
+      ['Test Phone Cable 2m', 499],
+    ]);
+  });
+
+  it('keeps unshipped items a charge was already split from', async () => {
+    const user = newUser();
+    const row = (ship: string, total: string, asin: string, name: string) =>
+      [
+        '111-0000001-0000001',
+        '2026-03-03T10:00:00Z',
+        ship,
+        'USD',
+        total,
+        asin,
+        'AmericanExpress - 0001',
+        'Closed',
+        name,
+        '1',
+        '1 Test St',
+      ]
+        .map((v) => `"${v}"`)
+        .join(',');
+    const items = (ship: string) =>
+      [
+        ORDER_HEADER,
+        row(ship, '12.50', 'B0TEST0001', 'Test Garden Hose Nozzle, Brass'),
+        row(ship, '4.99', 'B0TEST0002', 'Test Phone Cable 2m'),
+      ].join('\n');
+
+    await as(request(app).post('/imports/amazon'), user).send({ csv: items('Not Available') });
+    const { body } = await uploadStatement(user);
+    expect(rowOf(body, 'TEST0001').items).toHaveLength(2);
+
+    const later = await as(request(app).post('/imports/amazon'), user).send({
+      csv: items('2026-03-03T12:00:00Z'),
+    });
+    expect(later.body).toMatchObject({ itemCount: 4, matchedCount: 0 });
+    const after = await getImport(user, body.id);
+    expect(rowOf(after.body, 'TEST0001').items.map((i) => i.description)).toEqual([
+      'Test Garden Hose Nozzle, Brass',
+      'Test Phone Cable 2m',
+    ]);
+  });
+
+  it('keeps an unshipped item that the newest export still lists as unshipped', async () => {
+    const user = newUser();
+    const row = (ship: string, n: string) =>
+      [
+        '111-0000009-0000009',
+        '2026-03-03T10:00:00Z',
+        ship,
+        'USD',
+        '3.00',
+        'B0TEST0009',
+        'AmericanExpress - 0001',
+        'Closed',
+        `Test Pen ${n}`,
+        '1',
+        '1 Test St',
+      ]
+        .map((v) => `"${v}"`)
+        .join(',');
+    // Two identical pens: one shipped, the other still waiting, in both exports.
+    const csv = [ORDER_HEADER, row('2026-03-04T12:00:00Z', 'A'), row('Not Available', 'B')].join(
+      '\n',
+    );
+    await as(request(app).post('/imports/amazon'), user).send({ csv });
+    const again = await as(request(app).post('/imports/amazon'), user).send({ csv });
+    expect(again.body).toMatchObject({ itemCount: 2, newItemCount: 0 });
+  });
+
   it('splits a charge into its items when the order history comes first', async () => {
     const user = newUser();
     const orders = await uploadOrders(user);
