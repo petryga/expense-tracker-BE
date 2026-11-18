@@ -11,6 +11,7 @@ import { unpairItems } from './itemRefundPairing.js';
 import { forgetSaved, recordSaved } from './savedRows.js';
 import { recordOutcome } from './suggestionOutcomes.js';
 import { findOwnBatch, lockUser } from './userLock.js';
+import { marketplaceNames, merchantFor } from '../marketplaces.js';
 
 export type ConfirmAction = 'save' | 'skip' | 'return';
 export interface ConfirmDecision {
@@ -29,6 +30,9 @@ export interface ItemDecision {
   description?: string;
   isGift?: boolean;
 }
+
+// The merchant of every item saved from a split Amazon charge (Expense.merchant).
+export const AMAZON_MERCHANT = 'Amazon';
 
 // Product names run long; an expense gets the first few words.
 export const shortName = (productName: string) => {
@@ -55,6 +59,10 @@ export const confirmImport = async (
   return sequelize.transaction(async (transaction) => {
     await lockUser(userId, transaction);
     const batch = await findOwnBatch(userId, batchId, transaction);
+    // The user's marketplaces, read once if a saved row needs them.
+    let marketplaces: string[] | undefined;
+    const marketplacesOf = async () =>
+      (marketplaces ??= await marketplaceNames(userId, transaction));
 
     const rows = await ImportedTransaction.findAll({
       where: { batchId, userId, id: decisions.map((d) => d.id) },
@@ -148,6 +156,8 @@ export const confirmImport = async (
               currency: batch.currency,
               ...isoDateParts(row.postedDate),
               isGift: choice.isGift === true,
+              // The description is the product name; this keeps where it came from.
+              merchant: AMAZON_MERCHANT,
               userId,
             },
             { transaction },
@@ -185,6 +195,7 @@ export const confirmImport = async (
             currency: batch.currency,
             ...isoDateParts(row.postedDate),
             isGift: decision.isGift === true,
+            merchant: merchantFor(description, await marketplacesOf()),
             userId,
           },
           { transaction },

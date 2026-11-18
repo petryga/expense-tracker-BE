@@ -282,6 +282,14 @@ describe('Amazon orders in statement import (real database)', () => {
       ['Test Garden Hose Nozzle, Brass', 'Garden', '12.5', true, '2026-03-04'],
       ['Cable', 'Electronics', '4.99', false, '2026-03-04'],
     ]);
+    // The names are product names; where they were bought is kept apart, and
+    // a search for "amazon" finds them.
+    expect(expenses.map((e) => e.merchant)).toEqual(['Amazon', 'Amazon']);
+    const found = await as(request(app).get('/expenses?search=amazon'), user);
+    expect(found.body.data.map((e: { description: string }) => e.description).sort()).toEqual([
+      'Cable',
+      'Test Garden Hose Nozzle, Brass',
+    ]);
 
     // Deleting the import deletes both item expenses.
     const del = await as(request(app).delete(`/imports/${body.id}`), user);

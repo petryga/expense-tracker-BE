@@ -8,12 +8,13 @@ export interface ReportExpense {
   description: string;
   amount: number | string;
   currency: string;
+  merchant?: string | null;
 }
 
 export interface CategoryBreakdown {
   category: string;
   total: number;
-  details: { description: string; amount: number; currency: string }[];
+  details: { description: string; amount: number; currency: string; merchant?: string }[];
 }
 
 export interface MonthlyReport {
@@ -48,7 +49,12 @@ export const buildMonthlyReport = (yearMonth: string, expenses: ReportExpense[])
       entry.total += amount;
     }
 
-    entry.details.push({ description: expense.description, amount, currency: expense.currency });
+    entry.details.push({
+      description: expense.description,
+      amount,
+      currency: expense.currency,
+      ...(expense.merchant ? { merchant: expense.merchant } : {}),
+    });
     byCategory.set(category, entry);
   }
 

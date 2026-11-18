@@ -19,6 +19,9 @@ export class Expense extends Model {
   declare userId: string;
   // Bought as a gift; reports count it under Gifts (see utils/gifts.ts).
   declare isGift: boolean;
+  // Where it was bought, when the description doesn't say ("Amazon" for the
+  // items of a split Amazon charge, saved under their product names).
+  declare merchant: string | null;
 }
 
 Expense.init(
@@ -79,6 +82,10 @@ Expense.init(
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: false,
+    },
+    merchant: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
     },
   },
   {

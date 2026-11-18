@@ -84,6 +84,10 @@ To enable auth, set `SUPABASE_URL` (and drop `AUTH_DISABLED`); the frontend must
 | `npm test` | Vitest |
 | `npm run lint` / `npm run typecheck` | both fail on any warning |
 
+## Merchant
+
+`expenses.merchant` says where something was bought when the description doesn't. Items of a split Amazon charge are saved under their product names with merchant `Amazon`. The user's marketplaces (`GET/POST/DELETE /marketplaces`, Settings) name the merchant of any new expense, typed or imported, whose description starts with one of them: the name must end at a word boundary, and the longest wins. A typed expense also loses the name and any dash after it ("eBay - phone case" becomes "Phone case", merchant eBay); an imported row keeps the bank's text (`EBAY O*…`). Amazon on that list changes nothing about matching or splitting. Search (`GET /expenses?search=`) matches the merchant too, so "amazon" finds the items. `scripts/tag-amazon-merchant.ts` tagged the items split by the one-time old-expense script, from its review files (preview by default, `--apply` to write).
+
 ## Statement import
 
 Upload an Amex activity CSV (the detailed export, which has a unique `Reference` per row), review the rows, confirm. Nothing becomes an expense without a confirm.

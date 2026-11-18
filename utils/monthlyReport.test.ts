@@ -50,6 +50,17 @@ describe('buildMonthlyReport', () => {
     expect(report.totalSpentUsd).toBe(0);
   });
 
+  it('names the merchant of an item only when there is one', () => {
+    const report = buildMonthlyReport('2026-10', [
+      { ...exp('Home', 12, 'USD', 'Test Lamp'), merchant: 'Amazon' },
+      { ...exp('Home', 3, 'USD', 'Corner Hardware'), merchant: null },
+    ]);
+    expect(report.dataByCategory[0].details).toEqual([
+      { description: 'Test Lamp', amount: 12, currency: 'USD', merchant: 'Amazon' },
+      { description: 'Corner Hardware', amount: 3, currency: 'USD' },
+    ]);
+  });
+
   it('files blank categories under Uncategorized', () => {
     const report = buildMonthlyReport('2026-10', [exp(null, 4), exp('  ', 6)]);
     expect(report.dataByCategory).toHaveLength(1);

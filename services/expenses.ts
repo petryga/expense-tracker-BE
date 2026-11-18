@@ -3,6 +3,7 @@ import { Currency, Expense } from '../models/Expense.js';
 import { createExpenseObject } from '../utils/expensesUtils.js';
 import { Op } from 'sequelize';
 import { handleError } from '../utils/common.js';
+import { marketplaceNames, splitMarketplace } from '../utils/marketplaces.js';
 
 const router = Router();
 
@@ -58,6 +59,8 @@ router.get('/', async (req, res) => {
           userId,
           [Op.or]: [
             { description: { [Op.iLike]: `%${search}%` } },
+            // "Amazon" finds the items of split Amazon charges, saved under product names.
+            { merchant: { [Op.iLike]: `%${search}%` } },
             { category: { [Op.iLike]: `%${search}%` } },
             // Gifts are a flag, not a category: searching "gift" finds them too.
             ...(matchesGifts(search) ? [{ isGift: true }] : []),
@@ -89,18 +92,24 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const userId = req.userId;
-    if (Array.isArray(req.body)) {
-      const expenses = req.body.map((item) => createExpenseObject(item, userId));
-
+    // Validated first (a bad date throws a 400), then a description starting
+    // with one of the user's marketplaces names the merchant and loses the name.
+    const many = Array.isArray(req.body);
+    const parsed = (many ? req.body : [req.body]).map((item: unknown) =>
+      createExpenseObject(item as Parameters<typeof createExpenseObject>[0], userId),
+    );
+    const names = await marketplaceNames(userId);
+    const expenses = parsed.map((expense: ReturnType<typeof createExpenseObject>) => ({
+      ...expense,
+      ...splitMarketplace(expense.description ?? '', names),
+    }));
+    if (many) {
       const newExpenses = await Expense.bulkCreate(expenses);
-
       res.status(201).json(newExpenses);
       return;
     }
 
-    const expense = createExpenseObject(req.body, userId);
-    const newExpense = await Expense.create(expense);
-
+    const newExpense = await Expense.create(expenses[0]);
     res.status(201).json(newExpense);
   } catch (error) {
     handleError(res, error, 'Failed to create new expense');

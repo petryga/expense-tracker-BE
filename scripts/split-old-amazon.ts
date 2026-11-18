@@ -28,7 +28,7 @@ import { ImportedItem } from '../models/ImportedItem.js';
 import { ImportedTransaction } from '../models/ImportedTransaction.js';
 import { DEFAULT_OPTIONS, findSplits } from '../utils/amazon/oldExpenses.js';
 import { parseOrderHistory } from '../utils/amazon/orderHistory.js';
-import { shortName } from '../utils/imports/confirm.js';
+import { AMAZON_MERCHANT, shortName } from '../utils/imports/confirm.js';
 import { centsToAmount, parseCents } from '../utils/statementParsers/money.js';
 
 const COLUMNS = [
@@ -204,6 +204,7 @@ const apply = async () => {
             id: randomUUID(),
             category: part.new_category?.trim() || expense.category,
             description: part.new_description?.trim() || shortName(part.product_name),
+            merchant: AMAZON_MERCHANT,
             account: expense.account,
             amount: centsToAmount(parseCents(part.item_amount)!),
             datePosted: expense.datePosted,
@@ -225,6 +226,7 @@ const apply = async () => {
           id: randomUUID(),
           category: line.new_category.trim(),
           description: line.new_description?.trim() || shortName(line.product_name),
+          merchant: AMAZON_MERCHANT,
           account: line.account.trim(),
           amount: centsToAmount(parseCents(line.item_amount)!),
           datePosted: line.date,

@@ -4,6 +4,7 @@ import { IncomeEntry } from '../models/IncomeEntry.js';
 import { RecurringExpense } from '../models/RecurringExpense.js';
 import { RecurringIncomeEntry } from '../models/RecurringIncomeEntry.js';
 import { Account } from '../models/Account.js';
+import { Marketplace } from '../models/Marketplace.js';
 import { Category } from '../models/Category.js';
 import { CategoryBudget } from '../models/CategoryBudget.js';
 import { ImportBatch } from '../models/ImportBatch.js';
@@ -110,6 +111,7 @@ export const resetDemoUserData = async (userId: string) => {
     await RecurringExpense.destroy({ where: { userId }, transaction });
     await RecurringIncomeEntry.destroy({ where: { userId }, transaction });
     await Account.destroy({ where: { userId }, transaction });
+    await Marketplace.destroy({ where: { userId }, transaction });
     // Sample statement imports: drafts, pairs and the batches themselves, and
     // everything kept after an import (saved rows, suggestion records), so the
     // next visitor's sample import offers every row again.

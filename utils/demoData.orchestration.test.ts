@@ -6,6 +6,7 @@ import { IncomeEntry } from '../models/IncomeEntry.js';
 import { RecurringExpense } from '../models/RecurringExpense.js';
 import { RecurringIncomeEntry } from '../models/RecurringIncomeEntry.js';
 import { Account } from '../models/Account.js';
+import { Marketplace } from '../models/Marketplace.js';
 import { Category } from '../models/Category.js';
 import { CategoryBudget } from '../models/CategoryBudget.js';
 import { ImportBatch } from '../models/ImportBatch.js';
@@ -45,6 +46,7 @@ beforeEach(() => {
   vi.spyOn(RecurringIncomeEntry, 'bulkCreate').mockResolvedValue([] as any);
 
   vi.spyOn(Account, 'destroy').mockResolvedValue(0);
+  vi.spyOn(Marketplace, 'destroy').mockResolvedValue(0);
   vi.spyOn(Account, 'bulkCreate').mockResolvedValue([] as any);
 
   vi.spyOn(Category, 'destroy').mockResolvedValue(0);
@@ -63,7 +65,7 @@ afterEach(() => {
 });
 
 describe('resetDemoUserData', () => {
-  it('wipes all fourteen tables scoped to the given userId before reseeding', async () => {
+  it('wipes all fifteen tables scoped to the given userId before reseeding', async () => {
     await resetDemoUserData(USER_ID);
 
     expect(Expense.destroy).toHaveBeenCalledWith({
@@ -83,6 +85,10 @@ describe('resetDemoUserData', () => {
       transaction: FAKE_TRANSACTION,
     });
     expect(Account.destroy).toHaveBeenCalledWith({
+      where: { userId: USER_ID },
+      transaction: FAKE_TRANSACTION,
+    });
+    expect(Marketplace.destroy).toHaveBeenCalledWith({
       where: { userId: USER_ID },
       transaction: FAKE_TRANSACTION,
     });
