@@ -116,6 +116,7 @@ Every purchase saved on review (a statement charge, or one Amazon item) records 
 - One JSON line per request (pino-http): request id, method, path (no query string), status, duration, `userId`. Level from `LOG_LEVEL`; `LOG_PRETTY=true` for readable local output.
 - **Request ids:** every response has an `X-Request-Id`. A well-formed incoming one (`[A-Za-z0-9._-]`, up to 64 chars) is kept, so a proxy or another service can pass its own. To trace a request, search the logs for that id: the request line and any error logged while handling it carry it.
 - **Errors:** a central error middleware logs the error with its stack and the request id, and returns `{ error, requestId }`, never a stack trace. `handleError` (route-level 500s) does the same.
+- **Sentry** (`utils/sentry.ts`, off unless `SENTRY_DSN` is set): every 500 from either path is reported with its type, stack, method, route pattern and request id, tagged with the environment. Nothing else: no bodies, headers, cookies, query strings, IPs, user ids, local variables or breadcrumbs, and database errors keep their type only, since their messages can quote stored values. Collection is off at the SDK and a scrub runs before sending; tests run the real SDK with the network faked and check that no token or body leaves. `npx tsx scripts/sentry-test-error.ts` sends one test error.
 - **Never logged:** headers (so no tokens or cookies), request or response bodies, query strings (search text is expense descriptions), statement descriptions or amounts.
 
 ## Configuration

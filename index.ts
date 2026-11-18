@@ -1,3 +1,5 @@
+// First: Sentry must be set up before the app loads.
+import './instrument.js';
 import { sequelize as sequelizeConfig } from './config/database.js';
 import { app } from './app.js';
 

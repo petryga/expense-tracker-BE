@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { logger } from './logger.js';
 import { InvalidDateError } from './dates.js';
+import { reportError, routeOf } from './sentry.js';
 
 // Logs an unexpected failure and returns a generic 500. Only ever called from
 // a catch block — expected rejections (validation, not found, forbidden) use
@@ -16,5 +17,6 @@ export const handleError = (res: Response, error: unknown, message: string) => {
   // carries the request id. Fall back to the root logger for bare test doubles.
   const req = res.req as Request | undefined;
   (req?.log ?? logger).error({ err: error }, message);
+  reportError(error, String(req?.id ?? 'none'), routeOf(req));
   res.status(500).json(req?.id ? { error: message, requestId: req.id } : { error: message });
 };

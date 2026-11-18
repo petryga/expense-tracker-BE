@@ -1,4 +1,5 @@
 import type { ErrorRequestHandler } from 'express';
+import { reportError, routeOf } from '../utils/sentry.js';
 
 interface HttpishError {
   status?: number;
@@ -19,8 +20,10 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
   const candidate = e.status ?? e.statusCode;
   const status = candidate && candidate >= 400 && candidate < 600 ? candidate : 500;
 
-  if (status >= 500) req.log.error({ err }, 'Unhandled error');
-  else req.log.warn({ err: { type: (err as Error)?.name, message: e.message } }, 'Request error');
+  if (status >= 500) {
+    req.log.error({ err }, 'Unhandled error');
+    reportError(err, String(req.id), routeOf(req));
+  } else req.log.warn({ err: { type: (err as Error)?.name, message: e.message } }, 'Request error');
 
   // body-parser errors (bad JSON, too large) set expose=true with a safe message.
   const message =
