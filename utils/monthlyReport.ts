@@ -1,5 +1,6 @@
 import { Op } from 'sequelize';
 import { Currency, Expense } from '../models/Expense.js';
+import { fromCents, toCents } from './money.js';
 import { reportCategory } from './gifts.js';
 
 export interface ReportExpense {
@@ -24,29 +25,29 @@ export interface MonthlyReport {
   totalSpentUsd: number;
 }
 
-const round2 = (value: number) => parseFloat(value.toFixed(2));
-
 // Pure: one month's expenses -> per-category breakdown, biggest first.
 // Zero/negative amounts are skipped; only CAD/USD rows count toward totals
 // (a row in any other currency is listed in details but not summed).
 export const buildMonthlyReport = (yearMonth: string, expenses: ReportExpense[]): MonthlyReport => {
-  const byCategory = new Map<string, CategoryBreakdown>();
+  // Totals are added in whole cents (utils/money.ts), so they are exact.
+  const byCategory = new Map<string, CategoryBreakdown & { cents: number }>();
   let totalCad = 0;
   let totalUsd = 0;
 
   for (const expense of expenses) {
     const amount = Number(expense.amount);
     if (!Number.isFinite(amount) || amount <= 0) continue;
+    const cents = toCents(amount);
 
     const category = reportCategory(expense.category, expense.isGift);
-    const entry = byCategory.get(category) ?? { category, total: 0, details: [] };
+    const entry = byCategory.get(category) ?? { category, total: 0, cents: 0, details: [] };
 
     if (expense.currency === Currency.CAD) {
-      totalCad += amount;
-      entry.total += amount;
+      totalCad += cents;
+      entry.cents += cents;
     } else if (expense.currency === Currency.USD) {
-      totalUsd += amount;
-      entry.total += amount;
+      totalUsd += cents;
+      entry.cents += cents;
     }
 
     entry.details.push({
@@ -59,9 +60,9 @@ export const buildMonthlyReport = (yearMonth: string, expenses: ReportExpense[])
   }
 
   const dataByCategory = [...byCategory.values()]
-    .map((entry) => ({
+    .map(({ cents, ...entry }) => ({
       ...entry,
-      total: round2(entry.total),
+      total: fromCents(cents),
       details: entry.details.sort((a, b) => b.amount - a.amount),
     }))
     .sort((a, b) => b.total - a.total);
@@ -69,8 +70,8 @@ export const buildMonthlyReport = (yearMonth: string, expenses: ReportExpense[])
   return {
     yearMonth,
     dataByCategory,
-    totalSpentCad: round2(totalCad),
-    totalSpentUsd: round2(totalUsd),
+    totalSpentCad: fromCents(totalCad),
+    totalSpentUsd: fromCents(totalUsd),
   };
 };
 

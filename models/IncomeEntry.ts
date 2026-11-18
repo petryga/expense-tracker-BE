@@ -1,4 +1,5 @@
 import { Model, DataTypes } from 'sequelize';
+import { moneyColumn } from '../utils/money.js';
 import { sequelize } from '../config/database.js';
 
 export enum Currency {
@@ -11,7 +12,8 @@ export class IncomeEntry extends Model {
   declare date: string;
   declare description: string;
   declare category: string;
-  declare amount: string;
+  // Exact to the cent in the database; a number here (utils/money.ts).
+  declare amount: number;
   declare currency: Currency | '';
   declare userId: string;
 }
@@ -36,11 +38,7 @@ IncomeEntry.init(
       type: DataTypes.STRING,
       allowNull: true,
     },
-    amount: {
-      type: DataTypes.FLOAT,
-      allowNull: false,
-      defaultValue: 0,
-    },
+    amount: moneyColumn('amount', { defaultValue: 0 }),
     createdAt: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,

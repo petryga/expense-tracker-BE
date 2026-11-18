@@ -1,4 +1,5 @@
 import { Model, DataTypes } from 'sequelize';
+import { moneyColumn } from '../utils/money.js';
 import { sequelize } from '../config/database.js';
 
 export enum Currency {
@@ -9,7 +10,8 @@ export enum Currency {
 export class RecurringExpense extends Model {
   declare id: string;
   declare category: string;
-  declare amount: string;
+  // Exact to the cent in the database; a number here (utils/money.ts).
+  declare amount: number;
   declare account: string;
   declare description: string;
   declare dayOfMonth: number;
@@ -37,11 +39,7 @@ RecurringExpense.init(
       type: DataTypes.STRING,
       allowNull: false,
     },
-    amount: {
-      type: DataTypes.FLOAT,
-      allowNull: false,
-      defaultValue: 0,
-    },
+    amount: moneyColumn('amount', { defaultValue: 0 }),
     dayOfMonth: {
       type: DataTypes.INTEGER,
       allowNull: false,

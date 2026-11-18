@@ -1,4 +1,5 @@
 import { Model, DataTypes } from 'sequelize';
+import { moneyColumn } from '../utils/money.js';
 import { sequelize } from '../config/database.js';
 
 export class CategoryBudget extends Model {
@@ -20,10 +21,7 @@ CategoryBudget.init(
       type: DataTypes.UUID,
       allowNull: false,
     },
-    budget: {
-      type: DataTypes.FLOAT,
-      allowNull: true,
-    },
+    budget: moneyColumn('budget', { allowNull: true }),
     createdAt: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,

@@ -3,6 +3,7 @@ import { Currency, Expense } from '../models/Expense.js';
 import { createExpenseObject } from '../utils/expensesUtils.js';
 import { Op } from 'sequelize';
 import { handleError } from '../utils/common.js';
+import { fromCents, toCents } from '../utils/money.js';
 import { marketplaceNames, splitMarketplace } from '../utils/marketplaces.js';
 
 const router = Router();
@@ -13,15 +14,16 @@ const matchesGifts = (search: string) => {
   return term.length >= 3 && 'gifts'.startsWith(term.replace(/s$/, ''));
 };
 
+// Added in whole cents, so ten 0.10s make exactly 1.00.
 const sumByCurrency = (expenses: Expense[]) => {
   let cad = 0;
   let usd = 0;
   for (const expense of expenses) {
-    const amount = parseFloat(expense.amount);
-    if (expense.currency === Currency.CAD) cad += amount;
-    else if (expense.currency === Currency.USD) usd += amount;
+    const cents = toCents(expense.amount);
+    if (expense.currency === Currency.CAD) cad += cents;
+    else if (expense.currency === Currency.USD) usd += cents;
   }
-  return { cad: cad.toFixed(2), usd: usd.toFixed(2) };
+  return { cad: fromCents(cad).toFixed(2), usd: fromCents(usd).toFixed(2) };
 };
 
 router.get('/', async (req, res) => {
