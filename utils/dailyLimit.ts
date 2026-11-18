@@ -21,4 +21,18 @@ export const takeQuota = (
   return true;
 };
 
+// Whether `amount` would still fit in today's quota, without taking it. For
+// requests that must pass several quotas: check them all, then take each.
+export const hasQuota = (
+  kind: string,
+  userId: string | null,
+  amount: number,
+  limit: number,
+  now = new Date(),
+) => {
+  const entry = used.get(`${kind}:${userId ?? 'local'}`);
+  const n = entry?.day === now.toISOString().slice(0, 10) ? entry.n : 0;
+  return n + amount <= limit;
+};
+
 export const resetDailyLimits = () => used.clear();

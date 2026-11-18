@@ -1,7 +1,7 @@
 import express from 'express';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { resetDailyLimits, takeQuota } from '../utils/dailyLimit.js';
+import { hasQuota, resetDailyLimits, takeQuota } from '../utils/dailyLimit.js';
 import { serve } from '../testing/localServer.js';
 import assistant from './assistant.js';
 
@@ -45,6 +45,11 @@ describe('GET /assistant', () => {
     });
     expect((await request(await serve(buildApp('demo-user'))).get('/assistant')).body).toEqual({
       enabled: false,
+    });
+    vi.stubEnv('AI_ASSISTANT_DEMO_ENABLED', 'true');
+    expect((await request(await serve(buildApp('demo-user'))).get('/assistant')).body).toEqual({
+      enabled: true,
+      perVisitorDailyLimit: 5,
     });
     vi.stubEnv('AI_ASSISTANT_ENABLED', 'false');
     expect((await request(await serve(buildApp())).get('/assistant')).body).toEqual({
@@ -111,7 +116,7 @@ describe('POST /assistant', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('is closed to the demo user and when switched off', async () => {
+  it('is closed to the demo user unless the demo is switched on, and when switched off', async () => {
     vi.stubGlobal('fetch', aiAnswers());
     const demo = await request(await serve(buildApp('demo-user')))
       .post('/assistant')
@@ -146,6 +151,68 @@ describe('POST /assistant', () => {
       statuses.push((await request(server).post('/assistant').send({ question: 'Q' })).status);
     }
     expect(statuses).toEqual([200, 200, 429]);
+  });
+});
+
+describe('POST /assistant as the demo user', () => {
+  // Visitors share the demo login, so they are told apart by IP.
+  const demoApp = (ip: string) => {
+    const app = express();
+    app.use(express.json());
+    app.use((req, _res, next) => {
+      req.userId = 'demo-user';
+      Object.defineProperty(req, 'ip', { value: ip });
+      next();
+    });
+    app.use('/assistant', assistant);
+    return app;
+  };
+  const ask = async (ip: string) =>
+    request(await serve(demoApp(ip)))
+      .post('/assistant')
+      .send({ question: 'Q' });
+
+  beforeEach(() => vi.stubEnv('AI_ASSISTANT_DEMO_ENABLED', 'true'));
+
+  it('answers, limited per visitor', async () => {
+    vi.stubEnv('AI_ASSISTANT_DEMO_PER_VISITOR', '2');
+    vi.stubGlobal('fetch', aiAnswers());
+    const statuses = [];
+    for (let i = 0; i < 3; i++) statuses.push((await ask('203.0.113.1')).status);
+    expect(statuses).toEqual([200, 200, 429]);
+    const last = await ask('203.0.113.1');
+    expect(last.body.error).toMatch(/2 questions per visitor/);
+    expect((await ask('203.0.113.2')).status).toBe(200);
+  });
+
+  it('stops every visitor at the daily total, without using up their own quota', async () => {
+    vi.stubEnv('AI_ASSISTANT_DEMO_PER_VISITOR', '2');
+    vi.stubEnv('AI_ASSISTANT_DEMO_DAILY_LIMIT', '3');
+    const fetchMock = aiAnswers();
+    vi.stubGlobal('fetch', fetchMock);
+    expect((await ask('203.0.113.1')).status).toBe(200);
+    expect((await ask('203.0.113.1')).status).toBe(200);
+    expect((await ask('203.0.113.2')).status).toBe(200);
+    const over = await ask('203.0.113.3');
+    expect(over.status).toBe(429);
+    expect(over.body.error).toMatch(/its 3 questions for today/);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    // The refused question took nothing from that visitor's own two.
+    vi.stubEnv('AI_ASSISTANT_DEMO_DAILY_LIMIT', '10');
+    expect((await ask('203.0.113.3')).status).toBe(200);
+    expect((await ask('203.0.113.3')).status).toBe(200);
+    expect((await ask('203.0.113.3')).status).toBe(429);
+  });
+});
+
+describe('hasQuota', () => {
+  it('checks without taking', () => {
+    const day = new Date('2026-11-18T10:00:00Z');
+    expect(hasQuota('k', 'a', 1, 1, day)).toBe(true);
+    expect(hasQuota('k', 'a', 1, 1, day)).toBe(true);
+    takeQuota('k', 'a', 1, 1, day);
+    expect(hasQuota('k', 'a', 1, 1, day)).toBe(false);
+    expect(hasQuota('k', 'a', 1, 1, new Date('2026-11-19T00:00:01Z'))).toBe(true);
   });
 });
 
